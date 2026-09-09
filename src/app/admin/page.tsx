@@ -97,6 +97,8 @@ export default function AdminPage() {
       <header className={styles.header}>
         <div className={styles.headerLogo}>🎥 Equipe Ademilson — Admin</div>
         <div className={styles.headerActions}>
+          <a href="/kit-de-marca" target="_blank" className="btn btn-outline" style={{fontSize:"14px",padding:"8px 16px",textDecoration:"none"}}>🎨 Kit de Marca</a>
+          <a href="/assistente-configuracao" target="_blank" className="btn btn-outline" style={{fontSize:"14px",padding:"8px 16px",textDecoration:"none"}}>🚀 Assistente</a>
           <button onClick={exportCsv} className="btn btn-outline" style={{fontSize:"14px",padding:"8px 16px"}}>⬇ Exportar CSV</button>
           <button onClick={() => { setAuthed(false); setData(null); }} className={styles.logout}>Sair</button>
         </div>
