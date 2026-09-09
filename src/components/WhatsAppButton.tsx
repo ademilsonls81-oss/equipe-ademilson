@@ -1,21 +1,18 @@
 "use client";
 
-const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5511999999999";
-const WA_MSG = process.env.NEXT_PUBLIC_WHATSAPP_MESSAGE || "Olá! Quero saber mais sobre a Equipe Ademilson.";
+const WA_GROUP_LINK = "https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2?s=cl&p=a&mlu=4&ilr=4";
 
-export function getWhatsAppLink(customMsg?: string) {
-  const msg = encodeURIComponent(customMsg || WA_MSG);
-  return `https://wa.me/${WA_NUMBER}?text=${msg}`;
+export function getWhatsAppLink() {
+  return WA_GROUP_LINK;
 }
 
 interface Props {
   label?: string;
   className?: string;
-  customMsg?: string;
   eventLabel?: string;
 }
 
-export default function WhatsAppButton({ label = "Entrar na Equipe pelo WhatsApp", className = "", customMsg, eventLabel }: Props) {
+export default function WhatsAppButton({ label = "Entrar na Equipe pelo WhatsApp", className = "", eventLabel }: Props) {
   function handleClick() {
     if (typeof window !== "undefined" && (window as any).gtag) {
       (window as any).gtag("event", "click_whatsapp", { event_label: eventLabel || label });
@@ -27,7 +24,7 @@ export default function WhatsAppButton({ label = "Entrar na Equipe pelo WhatsApp
 
   return (
     <a
-      href={getWhatsAppLink(customMsg)}
+      href={getWhatsAppLink()}
       target="_blank"
       rel="noopener noreferrer"
       className={`btn btn-whatsapp ${className}`}
