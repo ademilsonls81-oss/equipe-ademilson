@@ -1,15 +1,41 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Navbar from "@/components/Navbar";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import RegisterForm from "@/components/RegisterForm";
 import FAQ from "@/components/FAQ";
 import styles from "./page.module.css";
 
+const APPROVED_PHONES = {
+  ios: [
+    "iPhone 12 / 12 Mini / 12 Pro / 12 Pro Max",
+    "iPhone 13 / 13 Mini / 13 Pro / 13 Pro Max",
+    "iPhone 14 / 14 Plus / 14 Pro / 14 Pro Max",
+    "iPhone 15 / 15 Plus / 15 Pro / 15 Pro Max",
+    "iPhone 16 / 16 Plus / 16 Pro / 16 Pro Max",
+    "iPhone 17 / 17 Plus / 17 Pro / 17 Pro Max",
+  ],
+  pixel: [
+    "Pixel 6 / 6 Pro / 6a",
+    "Pixel 7 / 7 Pro / 7a",
+    "Pixel 8 / 8 Pro / 8a",
+    "Pixel 9 / 9 Pro / 9 Pro XL / 9 Pro Fold",
+    "Pixel Fold",
+  ],
+  samsung: [
+    "Galaxy S21 / S21+ / S21 Ultra",
+    "Galaxy S22 / S22+ / S22 Ultra",
+    "Galaxy S23 / S23+ / S23 Ultra",
+    "Galaxy S24 / S24+ / S24 Ultra",
+    "Galaxy S25 / S25+ / S25 Ultra",
+  ],
+};
+
 function HomeContent() {
   const params = useSearchParams();
   const ref = params.get("ref") || undefined;
+  const [activeTab, setActiveTab] = useState<"ios" | "pixel" | "samsung">("ios");
 
   return (
     <>
@@ -117,6 +143,96 @@ function HomeContent() {
 
       <div className="divider" />
 
+      {/* ===== MODELOS DE CELULARES APROVADOS ===== */}
+      <section className="section" id="modelos-aprovados">
+        <div className="container">
+          <div className="text-center" style={{ marginBottom: 48 }}>
+            <span className="section-tag" style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}>
+              ⚡ Dispositivos Homologados
+            </span>
+            <h2 className="section-title">Modelos de Celulares <span style={{ color: "#4ade80" }}>Aprovados</span></h2>
+            <p className="section-subtitle">
+              Para garantir a qualidade exigida nos treinamentos de Inteligência Artificial, confira a lista oficial dos aparelhos compatíveis com o aplicativo:
+            </p>
+          </div>
+
+          <div className={styles.phoneListContainer}>
+            <div className={styles.phoneTabs}>
+              <button
+                className={`${styles.phoneTabBtn} ${activeTab === "ios" ? styles.activeTab : ""}`}
+                onClick={() => setActiveTab("ios")}
+              >
+                <span>🍎</span> Apple iOS
+              </button>
+              <button
+                className={`${styles.phoneTabBtn} ${activeTab === "pixel" ? styles.activeTab : ""}`}
+                onClick={() => setActiveTab("pixel")}
+              >
+                <span>📱</span> Google Pixel
+              </button>
+              <button
+                className={`${styles.phoneTabBtn} ${activeTab === "samsung" ? styles.activeTab : ""}`}
+                onClick={() => setActiveTab("samsung")}
+              >
+                <span>Galaxy</span> Samsung S
+              </button>
+            </div>
+
+            <div className={styles.phoneTabContent}>
+              {activeTab === "ios" && (
+                <div className={styles.phoneGroup}>
+                  <h3 className={styles.phoneGroupTitle}><span>📱</span> Linha iPhone (iOS)</h3>
+                  <ul className={styles.phoneGridList}>
+                    {APPROVED_PHONES.ios.map((model) => (
+                      <li key={model} className={styles.phoneItem}>
+                        <span className={styles.phoneCheck}>✓</span> {model}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {activeTab === "pixel" && (
+                <div className={styles.phoneGroup}>
+                  <h3 className={styles.phoneGroupTitle}><span>🤖</span> Android — Google Pixel</h3>
+                  <ul className={styles.phoneGridList}>
+                    {APPROVED_PHONES.pixel.map((model) => (
+                      <li key={model} className={styles.phoneItem}>
+                        <span className={styles.phoneCheck}>✓</span> {model}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {activeTab === "samsung" && (
+                <div className={styles.phoneGroup}>
+                  <h3 className={styles.phoneGroupTitle}><span>⭐</span> Android — Samsung Galaxy S</h3>
+                  <ul className={styles.phoneGridList}>
+                    {APPROVED_PHONES.samsung.map((model) => (
+                      <li key={model} className={styles.phoneItem}>
+                        <span className={styles.phoneCheck}>✓</span> {model}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.approvedBanner}>
+              <div className={styles.approvedNotice}>
+                <span>💡</span>
+                <p>
+                  <strong>Atenção:</strong> O aplicativo exige câmeras com estabilização e sensores de alta precisão presentes nos modelos listados acima (iPhones 12 ao 17, Google Pixel 6 ao 9/Fold, e Samsung Galaxy S21 ao S25).
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="divider" />
+
       {/* ===== QUE TIPO DE VÍDEO ===== */}
       <section className="section" id="tipo-video">
         <div className="container">
@@ -165,13 +281,13 @@ function HomeContent() {
               </p>
               <ul className={styles.checkList}>
                 {[
-                  ["✓", "Smartphone compatível com os requisitos do projeto"],
+                  ["✓", "Smartphone compatível homologado (iOS, Pixel ou Galaxy S)"],
                   ["✓", "Suporte adequado para gravação em primeira pessoa (POV)"],
                   ["✓", "Ambiente apropriado e com boa iluminação"],
                   ["✓", "Seguir exatamente as instruções de cada projeto"],
                   ["✓", "Conexão à internet para envio dos arquivos"],
                   ["✓", "Atenção aos critérios de qualidade exigidos"],
-                  ["⚠", "Equipamentos aceitos dependem da plataforma parceira"],
+                  ["⚠", "Equipamentos aceitos dependem do aplicativo e da plataforma parceira"],
                 ].map(([icon, text]) => (
                   <li key={text} className={icon === "⚠" ? styles.checkWarn : styles.checkOk}>
                     <span className={styles.checkIcon}>{icon}</span>
@@ -181,8 +297,8 @@ function HomeContent() {
               </ul>
             </div>
             <div className={styles.requiresCard}>
-              <h3>📱 Pronto para começar?</h3>
-              <p>Se você tem um smartphone, disposição para seguir instruções e quer conhecer melhor essa oportunidade, dê o primeiro passo.</p>
+              <h3>📱 Seu modelo está na lista?</h3>
+              <p>Se você tem um dos iPhones (12 ao 17), Google Pixel (6 ao 9) ou Samsung Galaxy (S21 ao S25) e suporte POV, dê o primeiro passo.</p>
               <a href="#participar" className="btn btn-primary" style={{ marginTop: 8 }}>Quero me cadastrar</a>
             </div>
           </div>
@@ -273,6 +389,7 @@ function HomeContent() {
             </div>
             <div className={styles.footerLinks}>
               <a href="#como-funciona">Como funciona</a>
+              <a href="#modelos-aprovados">Aparelhos Aceitos</a>
               <a href="#gratuito">Transparência</a>
               <a href="#faq">FAQ</a>
               <a href="#participar">Participar</a>
