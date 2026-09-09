@@ -1,0 +1,39 @@
+.form { display: flex; flex-direction: column; gap: 20px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.submitBtn { width: 100%; justify-content: center; padding: 16px !important; font-size: 17px !important; margin-top: 8px; }
+.alert {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #fca5a5;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 14px;
+}
+.hint { font-size: 13px; color: var(--text-muted); text-align: center; }
+.success {
+  text-align: center;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.successIcon { font-size: 56px; }
+.success h3 { font-size: 26px; color: var(--white); }
+.success p { color: var(--text-muted); max-width: 400px; }
+.refBox {
+  background: rgba(212,160,23,0.08);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+}
+.refBox p { font-size: 13px; color: var(--text-muted); }
+.refCode { font-size: 28px; color: var(--gold); font-family: "Outfit", sans-serif; letter-spacing: 4px; }
+.refLink { font-size: 12px; color: var(--text-muted); word-break: break-all; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 8px; width: 100%; text-align: center; }
+@media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
