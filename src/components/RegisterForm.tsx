@@ -92,7 +92,7 @@ export default function RegisterForm({ refCode }: { refCode?: string }) {
             <p>Seu código de indicação:</p>
             <strong className={styles.refCode}>{myCode}</strong>
             <p>Compartilhe com amigos usando o link:</p>
-            <code className={styles.refLink}>{typeof window !== "undefined" ? window.location.origin : ""}/entrar?ref={myCode}</code>
+            <code className={styles.refLink}>{typeof window !== "undefined" ? window.location.origin : ""}/?ref={myCode}</code>
           </div>
         )}
         <a href={WA_GROUP_LINK} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp" style={{marginTop:"24px",display:"inline-flex",gap:"8px"}}>

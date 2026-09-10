@@ -15,8 +15,9 @@ export default function Navbar() {
   const links = [
     { href: "#como-funciona", label: "Como funciona" },
     { href: "#o-que-voce-precisa", label: "Requisitos" },
-    { href: "#gratuito", label: "É gratuito?" },
-    { href: "#faq", label: "Dúvidas" },
+    { href: "/ganhos", label: "Ganhos" },
+    { href: "/blog", label: "Blog" },
+    { href: "/indicar", label: "Indicar" },
     { href: "#participar", label: "Participar" },
   ];
 

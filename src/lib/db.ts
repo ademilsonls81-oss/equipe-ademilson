@@ -101,4 +101,40 @@ export function exportCsv(): string {
   const body = rows.map(r => Object.values(r).map(v => v == null ? "" : `"${String(v).replace(/"/g,'""')}"`).join(","));
   return [h, ...body].join("\n");
 }
+export function getReferralStats(code: string) {
+  const db = getDb();
+  const refCode = db.prepare("SELECT * FROM referral_codes WHERE code=?").get(code) as any;
+  if (!refCode) return null;
+
+  const registration = db.prepare("SELECT * FROM registrations WHERE uid=?").get(refCode.registration_uid) as Registration;
+  if (!registration) return null;
+
+  const referralsCount = (db.prepare(
+    "SELECT COUNT(*) as c FROM registrations WHERE referral_code=?"
+  ).get(code) as any).c;
+
+  return {
+    ...registration,
+    my_referral_code: code,
+    referrals_count: referralsCount,
+  };
+}
+
+export function getTopReferrers(limit: number = 10) {
+  const db = getDb();
+  return db.prepare(`
+    SELECT rc.code, r.name, r.city, r.state,
+      (SELECT COUNT(*) FROM registrations r2 WHERE r2.referral_code = rc.code) as referrals_count
+    FROM referral_codes rc
+    JOIN registrations r ON r.uid = rc.registration_uid
+    WHERE rc.code IN (
+      SELECT referral_code FROM registrations WHERE referral_code IS NOT NULL
+      GROUP BY referral_code
+      HAVING COUNT(*) > 0
+    )
+    ORDER BY referrals_count DESC
+    LIMIT ?
+  `).all(limit) as { code: string; name: string; city: string; state: string; referrals_count: number }[];
+}
+
 export default getDb;

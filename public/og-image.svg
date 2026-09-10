@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0f2c"/>
+      <stop offset="100%" style="stop-color:#1a2355"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#d4a017"/>
+      <stop offset="100%" style="stop-color:#f0c040"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="60" y="60" width="1080" height="510" rx="20" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="600" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="64" font-weight="bold" fill="white">Equipe Ademilson</text>
+  <text x="600" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="url(#gold)">Renda com Vídeo IA</text>
+  <text x="600" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#94a3b8">Grave vídeos em primeira pessoa para treinamento de IA</text>
+  <text x="600" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#cbd5e1">100% Gratuito • Sem Taxas • Trabalhe de Casa</text>
+  <circle cx="180" cy="530" r="8" fill="#25d366"/>
+  <circle cx="200" cy="530" r="8" fill="#1da1f2"/>
+  <circle cx="220" cy="530" r="8" fill="#1877f2"/>
+</svg>

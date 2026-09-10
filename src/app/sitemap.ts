@@ -1,21 +1,26 @@
-// sitemap.ts
-import { MetadataRoute } from 'next';
+import { MetadataRoute } from "next";
+import { blogPosts } from "@/lib/blog";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://equipadedemilson.com.br';
-  
-  return [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 1.0,
-    },
-    {
-      url: `${baseUrl}/privacidade`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    },
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipadedemilson.com.br";
+
+  const staticPages = [
+    { url: baseUrl, lastModified: new Date(), changeFrequency: "weekly" as const, priority: 1.0 },
+    { url: `${baseUrl}/ganhos`, lastModified: new Date(), changeFrequency: "weekly" as const, priority: 0.9 },
+    { url: `${baseUrl}/blog`, lastModified: new Date(), changeFrequency: "weekly" as const, priority: 0.9 },
+    { url: `${baseUrl}/indicar`, lastModified: new Date(), changeFrequency: "weekly" as const, priority: 0.7 },
+    { url: `${baseUrl}/vantagens`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.6 },
+    { url: `${baseUrl}/kit-de-marca`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.5 },
+    { url: `${baseUrl}/assistente-configuracao`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.5 },
+    { url: `${baseUrl}/privacidade`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.3 },
   ];
+
+  const blogPages = blogPosts.map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.updatedAt || post.publishedAt),
+    changeFrequency: "monthly" as const,
+    priority: 0.8,
+  }));
+
+  return [...staticPages, ...blogPages];
 }

@@ -25,13 +25,13 @@ export const metadata: Metadata = {
     description:
       "Grave vídeos do dia a dia e participe de projetos de treinamento de IA. Entrada gratuita. Conheça como funciona.",
     siteName: "Equipe Ademilson",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Equipe Ademilson — Renda com Vídeo IA" }],
+    images: [{ url: "/og-image.svg", width: 1200, height: 630, alt: "Equipe Ademilson — Renda com Vídeo IA" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Equipe Ademilson — Renda com Vídeo IA",
     description: "Grave vídeos do dia a dia e participe de projetos de treinamento de IA. Entrada gratuita.",
-    images: ["/og-image.png"],
+    images: ["/og-image.svg"],
   },
   robots: { index: true, follow: true },
   alternates: { canonical: SITE_URL },

@@ -339,6 +339,83 @@ function HomeContent() {
 
       <div className="divider" />
 
+      {/* ===== GANHOS ===== */}
+      <section className="section" id="ganhos">
+        <div className="container">
+          <div className="text-center" style={{ marginBottom: 56 }}>
+            <span className="section-tag">💰 Ganhos</span>
+            <h2 className="section-title">Como você <span>ganha dinheiro</span></h2>
+            <p className="section-subtitle">
+              Dois caminhos para gerar renda: ganhos individuais e ganhos de rede.
+            </p>
+          </div>
+
+          <div className={styles.platformNoticeHome}>
+            <span>📌</span>
+            <div>
+              <p><strong>Os ganhos são pagos pela plataforma parceira MIMIX.</strong> A Equipe Ademilson divulga e capta participantes. Todas as regras de pagamento e funcionamento são explicadas no grupo do WhatsApp para quem entrar na equipe.</p>
+            </div>
+          </div>
+
+          <div className={styles.earningsGrid}>
+            <div className={styles.earningsCard}>
+              <span className={styles.earningsIcon}>🎯</span>
+              <h3>Ganhos Individuais</h3>
+              <div className={styles.earningsValue}>US$ 5<span>/hora</span></div>
+              <p>Grave vídeos aprovados e receba por cada hora. Sem indicação, sem equipe, sem meta.</p>
+              <ul className={styles.earningsList}>
+                <li>✓ 3.600 segundos aprovados = 1 hora paga</li>
+                <li>✓ Acumula segundos entre dias</li>
+                <li>✓ Sem taxa de participação</li>
+              </ul>
+            </div>
+
+            <div className={styles.earningsCard}>
+              <span className={styles.earningsIcon}>🔗</span>
+              <h3>Ganhos de Rede</h3>
+              <div className={styles.earningsValue}>US$ 0,50 – 2,00<span>/h de equipe</span></div>
+              <p>Indique pessoas e ganhe bônus sobre as horas aprovadas da sua equipe, em profundidade infinita.</p>
+              <ul className={styles.earningsList}>
+                <li>✓ Ranking V0 a V6</li>
+                <li>✓ Profundidade infinita</li>
+                <li>✓ Complementa ganhos individuais</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className={styles.earningsExample}>
+            <div className={styles.earningsExampleContent}>
+              <h3>Exemplo: V2 + 800h de equipe</h3>
+              <div className={styles.earningsMath}>
+                <div className={styles.earningsMathItem}>
+                  <span>Individual (40h × US$ 5)</span>
+                  <strong>US$ 200</strong>
+                </div>
+                <div className={styles.earningsMathItem}>
+                  <span>Rede (800h × US$ 1,00)</span>
+                  <strong>US$ 800</strong>
+                </div>
+                <div className={`${styles.earningsMathItem} ${styles.earningsMathTotal}`}>
+                  <span>Total</span>
+                  <strong>US$ 1.000</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center" style={{ marginTop: 40 }}>
+            <a href="/ganhos" className="btn btn-outline" style={{ marginRight: 12 }}>
+              Ver detalhes dos ganhos
+            </a>
+            <a href="#participar" className="btn btn-primary">
+              Quero participar
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <div className="divider" />
+
       {/* ===== FAQ ===== */}
       <FAQ />
 
