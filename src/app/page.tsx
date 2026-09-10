@@ -1,6 +1,6 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import WhatsAppButton from "@/components/WhatsAppButton";
@@ -37,6 +37,15 @@ function HomeContent() {
   const params = useSearchParams();
   const ref = params.get("ref") || undefined;
   const [activeTab, setActiveTab] = useState<"ios" | "pixel" | "samsung">("ios");
+  const [members, setMembers] = useState(0);
+  const [showQR, setShowQR] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((data) => setMembers(data.total || 0))
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -60,23 +69,40 @@ function HomeContent() {
             </p>
             <div className={`${styles.heroBadge} fade-up delay-1`}>
               <span className="badge-free">✅ Entrada gratuita — sem taxa para participar</span>
+              {members > 0 && (
+                <span className={styles.memberCount}>👥 {members} membros</span>
+              )}
             </div>
             <div className={`${styles.heroBtns} fade-up delay-2`}>
               <a
-                href="#participar"
-                className="btn btn-primary"
-                onClick={() => typeof window !== "undefined" && (window as any).gtag?.("event", "click_participar")}
+                href="https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-whatsapp"
+                onClick={() => typeof window !== "undefined" && (window as any).gtag?.("event", "click_whatsapp")}
               >
-                🎯 Quero participar
+                📱 Entrar no Grupo
               </a>
-              <a
-                href="#como-funciona"
+              <button
                 className="btn btn-outline"
-                onClick={() => typeof window !== "undefined" && (window as any).gtag?.("event", "click_como_funciona")}
+                onClick={() => setShowQR(!showQR)}
               >
-                Como funciona
-              </a>
+                📲 QR Code
+              </button>
             </div>
+            {showQR && (
+              <div className={`${styles.qrPopup} fade-up`}>
+                <p>Escaneie para entrar no grupo:</p>
+                <img
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2"
+                  alt="QR Code WhatsApp"
+                  width={180}
+                  height={180}
+                  style={{ borderRadius: 12, background: "white", padding: 8 }}
+                />
+                <button className={styles.qrClose} onClick={() => setShowQR(false)}>✕</button>
+              </div>
+            )}
           </div>
           <div className={`${styles.heroVisual} fade-up delay-3`}>
             <div className={styles.phoneCard}>

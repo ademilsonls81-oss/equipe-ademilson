@@ -1,0 +1,198 @@
+import { Metadata } from "next";
+import Link from "next/link";
+import styles from "./slug.module.css";
+
+const WA_GROUP = "https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2";
+
+const PAGES: Record<string, { title: string; description: string; h1: string; benefits: string[] }> = {
+  "renda-extra": {
+    title: "Grupo WhatsApp de Renda Extra | Entre Grátis",
+    description: "Entre no grupo WhatsApp de renda extra e aprenda a ganhar dinheiro gravando vídeos para IA. Cadastro gratuito, sem taxas.",
+    h1: "Grupo WhatsApp de Renda Extra",
+    benefits: [
+      "Oportunidades de ganho com gravação de vídeos",
+      "Informações sobre pagamentos em dólar",
+      "Dicas para gravar e aprovar seus vídeos",
+      "Comunidade ativa e apoio mútuo",
+    ],
+  },
+  "empregos": {
+    title: "Grupo WhatsApp de Empregos | Vagas Remotas",
+    description: "Encontre vagas de trabalho remoto no grupo WhatsApp. Oportunidades de gravação de vídeos para IA com pagamento em dólar.",
+    h1: "Grupo WhatsApp de Empregos",
+    benefits: [
+      "Vagas de trabalho remoto atualizadas",
+      "Oportunidades de ganho com celular",
+      "Sem necessidade de experiência",
+      "Flexibilidade de horário",
+    ],
+  },
+  "oportunidades": {
+    title: "Grupo WhatsApp de Oportunidades | Entre Grátis",
+    description: "Receba oportunidades reais de ganho pelo celular. Grupo WhatsApp gratuito com dicas e projetos de gravação de vídeos.",
+    h1: "Grupo WhatsApp de Oportunidades",
+    benefits: [
+      "Oportunidades verificadas e confiáveis",
+      "Projetos de gravação de vídeos para IA",
+      "Sem taxa de participação",
+      "Pagamento em dólar",
+    ],
+  },
+  "cursos-gratuitos": {
+    title: "Grupo WhatsApp de Cursos Gratuitos | Aprenda Grátis",
+    description: "Aprenda a ganhar dinheiro com vídeos gratuitamente. Grupo WhatsApp com dicas, tutoriais e orientações.",
+    h1: "Grupo WhatsApp de Cursos Gratuitos",
+    benefits: [
+      "Aprenda a gravar vídeos para IA",
+      "Dicas de qualidade e edição",
+      "Orientações de cada projeto",
+      "Tudo gratuito, sem taxas",
+    ],
+  },
+  "trabalho-casa": {
+    title: "Grupo WhatsApp Trabalho em Casa | Remoto",
+    description: "Trabalhe de casa pelo celular. Grupo WhatsApp com oportunidades de gravação de vídeos para treinamento de IA.",
+    h1: "Grupo WhatsApp de Trabalho em Casa",
+    benefits: [
+      "Trabalhe de casa, no seu horário",
+      "Só precisa de um celular",
+      "Sem experiência necessária",
+      "Pagamento por hora aprovada",
+    ],
+  },
+  "celular": {
+    title: "Ganhe Dinheiro com o Celular | Grupo WhatsApp",
+    description: "Aprenda a ganhar dinheiro usando apenas o celular. Grupo WhatsApp com projetos de gravação de vídeos para IA.",
+    h1: "Ganhe Dinheiro com o Celular",
+    benefits: [
+      "Use o celular que já tem",
+      "Grave vídeos do dia a dia",
+      "Receba em dólar por hora aprovada",
+      "Sem investimento inicial",
+    ],
+  },
+  "suzano": {
+    title: "Grupo WhatsApp Suzano | Oportunidades Locais",
+    description: "Grupo WhatsApp em Suzano com oportunidades de trabalho remoto e ganho com gravação de vídeos para IA.",
+    h1: "Grupo WhatsApp de Suzano",
+    benefits: [
+      "Oportunidades para moradores de Suzano",
+      "Trabalho remoto pelo celular",
+      "Comunidade local ativa",
+      "Sem precisar sair de casa",
+    ],
+  },
+  "sao-paulo": {
+    title: "Grupo WhatsApp São Paulo | Vagas e Oportunidades",
+    description: "Grupo WhatsApp em São Paulo com oportunidades de renda extra e trabalho remoto. Gravação de vídeos para IA.",
+    h1: "Grupo WhatsApp de São Paulo",
+    benefits: [
+      "Oportunidades para paulistanos",
+      "Renda extra com o celular",
+      "Projetos de gravação de vídeos",
+      "Sem taxa de participação",
+    ],
+  },
+  "emprego-remoto": {
+    title: "Emprego Remoto | Grupo WhatsApp",
+    description: "Encontre emprego remoto pelo celular. Grupo WhatsApp com vagas de gravação de vídeos para treinamento de IA.",
+    h1: "Emprego Remoto pelo Celular",
+    benefits: [
+      "Trabalhe de qualquer lugar",
+      "Horário flexível",
+      "Pagamento em dólar",
+      "Sem experiência necessária",
+    ],
+  },
+  "dinheiro-facil": {
+    title: "Dinheiro Fácil pelo Celular | Grupo WhatsApp",
+    description: "Ganhe dinheiro fácil pelo celular. Grupo WhatsApp com dicas reais de renda extra com gravação de vídeos.",
+    h1: "Dinheiro Fácil pelo Celular",
+    benefits: [
+      "Método simples e comprovado",
+      "Só precisa de um celular",
+      "Sem investimento",
+      "Pagamento rápido",
+    ],
+  },
+};
+
+export async function generateStaticParams() {
+  return Object.keys(PAGES).map((slug) => ({ slug }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const page = PAGES[slug];
+  if (!page) return {};
+
+  return {
+    title: page.title,
+    description: page.description,
+    alternates: {
+      canonical: `${process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app"}/grupo-whatsapp/${slug}`,
+    },
+    openGraph: {
+      title: page.title,
+      description: page.description,
+    },
+  };
+}
+
+export default async function GrupoWhatsAppPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const page = PAGES[slug];
+
+  if (!page) {
+    return (
+      <main className={styles.page}>
+        <div className={`container ${styles.content}`}>
+          <h1 className={styles.title}>Página não encontrada</h1>
+          <Link href="/" className="btn btn-primary">Voltar ao início</Link>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.bgOrb1} />
+      <div className={styles.bgOrb2} />
+
+      <div className={`container ${styles.content}`}>
+        <span className="section-tag">Grupo WhatsApp</span>
+
+        <h1 className={`${styles.title} fade-up`}>
+          {page.h1}
+        </h1>
+
+        <p className={`${styles.subtitle} fade-up delay-1`}>
+          Entre gratuitamente no grupo e comece a ganhar dinheiro gravando vídeos para IA.
+        </p>
+
+        <div className={`${styles.benefits} fade-up delay-2`}>
+          {page.benefits.map((b, i) => (
+            <div key={i} className={styles.benefitItem}>
+              <span>✓</span>
+              <span>{b}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className={`${styles.ctaBox} fade-up delay-3`}>
+          <a href={WA_GROUP} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp" style={{ width: "100%", justifyContent: "center", fontSize: "18px", padding: "18px 32px" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            ENTRAR NO GRUPO DO WHATSAPP
+          </a>
+          <p className={styles.ctaHint}>✅ 100% Gratuito — Sem taxas</p>
+        </div>
+
+        <div className={`${styles.extraLinks} fade-up delay-4`}>
+          <Link href="/ganhos">💰 Ver como ganhar</Link>
+          <Link href="/indicar">🔗 Sistema de indicação</Link>
+          <Link href="/blog">📝 Artigos sobre o projeto</Link>
+        </div>
+      </div>
+    </main>
+  );
+}
