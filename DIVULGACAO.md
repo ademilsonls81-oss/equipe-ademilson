@@ -19,7 +19,7 @@ O modelo é simples:
 
 Não precisa de experiência, não precisa pagar nada, só um celular com boa câmera e um suporte de peito.
 
-Estou na Equipe Ademilson (https://equipe-ademilson.com.br) que é uma equipe de divulgação. O cadastro é gratuito e pelo grupo do WhatsApp você recebe todas as orientações.
+Estou na Equipe Ademilson (https://equipe-ademilson.vercel.app) que é uma equipe de divulgação. O cadastro é gratuito e pelo grupo do WhatsApp você recebe todas as orientações.
 
 Se alguém tiver dúvidas, posso ajudar.
 
@@ -31,7 +31,7 @@ Se alguém tiver dúvidas, posso ajudar.
 **Texto:**
 Pessoal, comecei recentemente a gravar vídeos em primeira pessoa para projetos de IA. A ideia é gravar tarefas do dia a dia (cozinhar, limpar, organizar) e enviar para empresas que usam isso para treinar robôs.
 
-Encontrei a Equipe Ademilson (https://equipe-ademilson.com.br) que divulga esses projetos. O pagamento é por hora aprovada.
+Encontrei a Equipe Ademilson (https://equipe-ademilson.vercel.app) que divulga esses projetos. O pagamento é por hora aprovada.
 
 Alguém mais está nessa? Queria trocar experiência sobre qualidade de vídeo, dicas de gravação, etc.
 
@@ -50,7 +50,7 @@ Funciona assim:
 2. Tarefas são simples: cozinhar, lavar louça, organizar
 3. Recebe por hora aprovada
 
-Estou na Equipe Ademilson (https://equipe-ademilson.com.br). Cadastro gratuito, sem taxas.
+Estou na Equipe Ademilson (https://equipe-ademilson.vercel.app). Cadastro gratuito, sem taxas.
 
 ---
 
@@ -67,7 +67,7 @@ O modelo:
 - Recebe US$ 5 por hora aprovada
 - Sem precisar indicar ninguém
 
-Estou na Equipe Ademilson (https://equipe-ademilson.com.br). Cadastro gratuito.
+Estou na Equipe Ademilson (https://equipe-ademilson.vercel.app). Cadastro gratuito.
 
 Não é esquema pirâmide, é trabalho mesmo. Só que pouca gente sabe que essa oportunidade existe.
 
@@ -87,7 +87,7 @@ Vantagens:
 - Só precisa do celular
 - Pagamento em dólar
 
-Estou na Equipe Ademilson (https://equipe-ademilson.com.br). Cadastro gratuito.
+Estou na Equipe Ademilson (https://equipe-ademilson.vercel.app). Cadastro gratuito.
 
 Se alguém quiser saber mais, é só perguntar.
 
@@ -118,7 +118,7 @@ Pessoal, queria compartilhar algo que estou fazendo e que está dando resultado:
 ❌ Ter experiência
 ❌ Indicar pessoas
 
-Estou na Equipe Ademilson. Cadastro gratuito pelo site: https://equipe-ademilson.com.br
+Estou na Equipe Ademilson. Cadastro gratuito pelo site: https://equipe-ademilson.vercel.app
 
 Se tiverem dúvidas, podem perguntar aqui! 😊
 
@@ -144,7 +144,7 @@ Galera, tem uma oportunidade que pouca gente conhece. Empresas de IA precisam de
 - Suporte de peito
 - Internet
 
-Cadastre-se gratuitamente: https://equipe-ademilson.com.br
+Cadastre-se gratuitamente: https://equipe-ademilson.vercel.app
 
 Não é furada, é trabalho real. Só que pouca gente sabe que essa área existe.
 
@@ -164,7 +164,7 @@ O modelo é simples:
 → Tarefas do dia a dia (cozinhar, limpar, organizar)
 → Pagamento por hora aprovada
 
-Estou divulgando projetos nessa área pela Equipe Ademilson (https://equipe-ademilson.com.br).
+Estou divulgando projetos nessa área pela Equipe Ademilson (https://equipe-ademilson.vercel.app).
 
 Se você busca uma renda extra flexível ou conhece alguém que possa se interessar, compartilhe essa oportunidade.
 
@@ -183,7 +183,7 @@ A ideia é gravar vídeos do dia a dia em primeira pessoa (cozinhar, limpar, org
 
 O pagamento é por hora aprovada. Cadastro gratuito, sem taxas.
 
-Se alguém quiser saber mais: https://equipe-ademilson.com.br
+Se alguém quiser saber mais: https://equipe-ademilson.vercel.app
 
 ---
 
@@ -194,7 +194,7 @@ Oi! Tudo bem? Vi que você se interessa por renda extra. Queria te mostrar uma o
 
 É simples: você grava com o celular fazendo tarefas domésticas e recebe por hora aprovada. Cadastro gratuito.
 
-Site: https://equipe-ademilson.com.br
+Site: https://equipe-ademilson.vercel.app
 
 Se tiver dúvida, é só perguntar! 😊
 
@@ -233,7 +233,7 @@ Quanto mais real, melhor. Por isso pagam bem por vídeos de pessoas comuns.
 
 **Tweet 4:**
 Estou na Equipe Ademilson:
-🔗 https://equipe-ademilson.com.br
+🔗 https://equipe-ademilson.vercel.app
 
 Cadastro gratuito. Se tiver dúvida, pergunta aqui! 👇
 
@@ -241,11 +241,11 @@ Cadastro gratuito. Se tiver dúvida, pergunta aqui! 👇
 
 ## 📌 LINKS PARA USAR
 
-- **Site principal:** https://equipe-ademilson.com.br
-- **Blog:** https://equipe-ademilson.com.br/blog
-- **Artigo 1:** https://equipe-ademilson.com.br/blog/trabalhar-gravando-videos-para-ia
-- **Artigo 2:** https://equipe-ademilson.com.br/blog/renda-extra-gravando-videos-pelo-celular
-- **Artigo 3:** https://equipe-ademilson.com.br/blog/como-ganhar-dinheiro-com-celular
-- **Artigo 4:** https://equipe-ademilson.com.br/blog/trabalho-de-casa-pelo-celular
-- **Artigo 5:** https://equipe-ademilson.com.br/blog/gravar-videos-para-ganhar-dinheiro
+- **Site principal:** https://equipe-ademilson.vercel.app
+- **Blog:** https://equipe-ademilson.vercel.app/blog
+- **Artigo 1:** https://equipe-ademilson.vercel.app/blog/trabalhar-gravando-videos-para-ia
+- **Artigo 2:** https://equipe-ademilson.vercel.app/blog/renda-extra-gravando-videos-pelo-celular
+- **Artigo 3:** https://equipe-ademilson.vercel.app/blog/como-ganhar-dinheiro-com-celular
+- **Artigo 4:** https://equipe-ademilson.vercel.app/blog/trabalho-de-casa-pelo-celular
+- **Artigo 5:** https://equipe-ademilson.vercel.app/blog/gravar-videos-para-ganhar-dinheiro
 - **Grupo WhatsApp:** https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://equipadedemilson.com.br";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
 
 export default function PrivacyPage() {
   return (

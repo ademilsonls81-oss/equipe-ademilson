@@ -2,7 +2,7 @@
 import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://equipadedemilson.com.br';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://equipe-ademilson.vercel.app';
   
   return {
     rules: {

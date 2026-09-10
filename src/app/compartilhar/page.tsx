@@ -2,7 +2,7 @@
 import { useState } from "react";
 import styles from "./compartilhar.module.css";
 
-const SITE_URL = "https://equipe-ademilson.com.br";
+const SITE_URL = "https://equipe-ademilson.vercel.app";
 
 const REDDIT_POSTS = [
   {

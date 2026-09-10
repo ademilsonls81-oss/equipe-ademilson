@@ -467,7 +467,7 @@ function HomeContent() {
           </p>
           <div className={styles.shareRow}>
             <a
-              href={`https://wa.me/?text=${encodeURIComponent("Conheça a Equipe Ademilson! Grave vídeos do dia a dia para IA e ganhe em dólar. Cadastro gratuito: " + "https://equipe-ademilson.com.br")}`}
+              href={`https://wa.me/?text=${encodeURIComponent("Conheça a Equipe Ademilson! Grave vídeos do dia a dia para IA e ganhe em dólar. Cadastro gratuito: " + "https://equipe-ademilson.vercel.app")}`}
               target="_blank"
               rel="noopener noreferrer"
               className={`${styles.shareHomeBtn} ${styles.shareWa}`}
@@ -475,7 +475,7 @@ function HomeContent() {
               📱 WhatsApp
             </a>
             <a
-              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent("https://equipe-ademilson.com.br")}&text=${encodeURIComponent("Estou ganhando dinheiro gravando vídeos para IA 🎥 Cadastro gratuito!")}`}
+              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent("https://equipe-ademilson.vercel.app")}&text=${encodeURIComponent("Estou ganhando dinheiro gravando vídeos para IA 🎥 Cadastro gratuito!")}`}
               target="_blank"
               rel="noopener noreferrer"
               className={`${styles.shareHomeBtn} ${styles.shareTw}`}
@@ -483,7 +483,7 @@ function HomeContent() {
               🐦 Twitter / X
             </a>
             <a
-              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://equipe-ademilson.com.br")}`}
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://equipe-ademilson.vercel.app")}`}
               target="_blank"
               rel="noopener noreferrer"
               className={`${styles.shareHomeBtn} ${styles.shareFb}`}

@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       tags: post.tags,
     },
     alternates: {
-      canonical: `${process.env.NEXT_PUBLIC_SITE_URL || "https://equipadedemilson.com.br"}/blog/${post.slug}`,
+      canonical: `${process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app"}/blog/${post.slug}`,
     },
   };
 }
@@ -78,7 +78,7 @@ export default async function BlogPostPage({ params }: Props) {
   const post = getPostBySlug(slug);
   if (!post) notFound();
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipadedemilson.com.br";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
 
   return (
     <main className={styles.page}>
