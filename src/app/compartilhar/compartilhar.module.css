@@ -1,0 +1,154 @@
+.page { padding-top: 80px; }
+
+.hero {
+  padding: 80px 0 40px;
+  text-align: center;
+}
+.sectionSubtitle {
+  font-size: 17px;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.content { padding: 0 0 80px; }
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+.tab {
+  padding: 12px 24px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tab:hover { border-color: var(--gold); color: var(--gold); }
+.tabActive {
+  background: rgba(212,160,23,0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.postsList {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.postsList h2 {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+.hint {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.postCard {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.postHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.subreddit, .group, .tweetNum {
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(212,160,23,0.15);
+  color: var(--gold);
+}
+.postTitle {
+  font-size: 15px;
+  color: var(--white);
+  font-weight: 600;
+}
+.postText {
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.6;
+  background: rgba(0,0,0,0.2);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.postActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.copyBtn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(212,160,23,0.15);
+  border: 1px solid rgba(212,160,23,0.3);
+  color: var(--gold);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.copyBtn:hover { background: rgba(212,160,23,0.25); }
+
+.linksSection {
+  max-width: 800px;
+  margin: 60px auto 0;
+}
+.linksSection h2 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+.linksGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.linkItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+}
+.linkItem span {
+  font-size: 14px;
+  color: var(--text-muted);
+  min-width: 100px;
+}
+.linkItem code {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-body);
+  word-break: break-all;
+}
+
+@media (max-width: 600px) {
+  .tabs { gap: 6px; }
+  .tab { padding: 10px 16px; font-size: 14px; }
+  .postActions { flex-direction: column; }
+  .postActions .btn { width: 100%; justify-content: center; }
+}

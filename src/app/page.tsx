@@ -1,6 +1,7 @@
 "use client";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import RegisterForm from "@/components/RegisterForm";
@@ -453,6 +454,46 @@ function HomeContent() {
           </p>
           <WhatsAppButton label="Entrar na Equipe pelo WhatsApp" eventLabel="footer_cta" />
           <p className={styles.waHint}>Horário de atendimento pode variar. Não garantimos resposta imediata.</p>
+        </div>
+      </section>
+
+      {/* ===== COMPARTILHAR ===== */}
+      <section className="section" id="compartilhar">
+        <div className="container text-center">
+          <span className="section-tag">📢 Divulgue</span>
+          <h2 className="section-title">Ajude a <span>espalhar</span></h2>
+          <p className="section-subtitle" style={{ margin: "0 auto 32px" }}>
+            Compartilhe com amigos e ajude mais pessoas a conhecer essa oportunidade.
+          </p>
+          <div className={styles.shareRow}>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent("Conheça a Equipe Ademilson! Grave vídeos do dia a dia para IA e ganhe em dólar. Cadastro gratuito: " + "https://equipe-ademilson.com.br")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${styles.shareHomeBtn} ${styles.shareWa}`}
+            >
+              📱 WhatsApp
+            </a>
+            <a
+              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent("https://equipe-ademilson.com.br")}&text=${encodeURIComponent("Estou ganhando dinheiro gravando vídeos para IA 🎥 Cadastro gratuito!")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${styles.shareHomeBtn} ${styles.shareTw}`}
+            >
+              🐦 Twitter / X
+            </a>
+            <a
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://equipe-ademilson.com.br")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${styles.shareHomeBtn} ${styles.shareFb}`}
+            >
+              📘 Facebook
+            </a>
+            <Link href="/compartilhar" className={`${styles.shareHomeBtn} ${styles.shareMore}`}>
+              📋 Mais opções
+            </Link>
+          </div>
         </div>
       </section>
 

@@ -467,6 +467,40 @@
   font-weight: 900;
 }
 
+/* SHARE BUTTONS HOME */
+.shareRow {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.shareHomeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  transition: all 0.2s;
+}
+.shareHomeBtn:hover { transform: translateY(-2px); }
+.shareWa { background: #25d366; }
+.shareWa:hover { box-shadow: 0 4px 16px rgba(37,211,102,0.4); }
+.shareTw { background: #1da1f2; }
+.shareTw:hover { box-shadow: 0 4px 16px rgba(29,161,242,0.4); }
+.shareFb { background: #1877f2; }
+.shareFb:hover { box-shadow: 0 4px 16px rgba(24,119,242,0.4); }
+.shareMore {
+  background: rgba(212,160,23,0.15);
+  border: 1px solid rgba(212,160,23,0.3);
+  color: var(--gold);
+}
+.shareMore:hover { background: rgba(212,160,23,0.25); }
+
 @media (max-width: 768px) {
   .earningsGrid { grid-template-columns: 1fr; }
+  .shareRow { gap: 8px; }
+  .shareHomeBtn { padding: 10px 18px; font-size: 14px; }
 }

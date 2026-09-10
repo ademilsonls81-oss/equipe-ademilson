@@ -17,7 +17,7 @@ export default function Navbar() {
     { href: "#o-que-voce-precisa", label: "Requisitos" },
     { href: "/ganhos", label: "Ganhos" },
     { href: "/blog", label: "Blog" },
-    { href: "/indicar", label: "Indicar" },
+    { href: "/compartilhar", label: "Divulgar" },
     { href: "#participar", label: "Participar" },
   ];
 
