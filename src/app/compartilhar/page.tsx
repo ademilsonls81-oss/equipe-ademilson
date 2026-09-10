@@ -8,7 +8,6 @@ const REDDIT_POSTS = [
   {
     subreddit: "r/rendaextra",
     title: "Ganho US$ 5 por hora gravando vídeos do dia a dia para IA (trabalho remoto)",
-    url: "https://reddit.com/r/rendaextra/submit?title=" + encodeURIComponent("Ganho US$ 5 por hora gravando vídeos do dia a dia para IA (trabalho remoto)"),
     text: `Galera, queria compartilhar uma oportunidade que estou aproveitando. Existe uma demanda enorme de empresas de IA que precisam de vídeos gravados por pessoas reais para treinar robôs e sistemas autônomos.
 
 O modelo é simples:
@@ -25,7 +24,6 @@ Se alguém tiver dúvidas, posso ajudar.`,
   {
     subreddit: "r/trabalho",
     title: "Alguém já trabalhou gravando vídeos para treinamento de IA?",
-    url: "https://reddit.com/r/trabalho/submit?title=" + encodeURIComponent("Alguém já trabalhou gravando vídeos para treinamento de IA?"),
     text: `Pessoal, comecei recentemente a gravar vídeos em primeira pessoa para projetos de IA. A ideia é gravar tarefas do dia a dia (cozinhar, limpar, organizar) e enviar para empresas que usam isso para treinar robôs.
 
 Encontrei a Equipe Ademilson (${SITE_URL}) que divulga esses projetos. O pagamento é por hora aprovada.
@@ -35,7 +33,6 @@ Alguém mais está nessa? Queria trocar experiência sobre qualidade de vídeo, 
   {
     subreddit: "r/foradecasa",
     title: "Trabalho remoto pagando em dólar: gravando vídeos para IA",
-    url: "https://reddit.com/r/foradecasa/submit?title=" + encodeURIComponent("Trabalho remoto pagando em dólar: gravando vídeos para IA"),
     text: `Para quem está buscando oportunidades remotas, existe uma área que está crescendo muito: gravar vídeos para treinamento de Inteligência Artificial.
 
 Empresas precisam de vídeos reais de pessoas fazendo tarefas cotidianas para treinar seus sistemas. O pagamento é em dólar.
@@ -50,7 +47,6 @@ Estou na Equipe Ademilson (${SITE_URL}). Cadastro gratuito, sem taxas.`,
   {
     subreddit: "r/investimentos",
     title: "Renda extra em dólar: como estou ganhando com gravação de vídeos para IA",
-    url: "https://reddit.com/r/investimentos/submit?title=" + encodeURIComponent("Renda extra em dólar: como estou ganhando com gravação de vídeos para IA"),
     text: `Galera, queria compartilhar uma renda extra que descobri recentemente. Não é investimento, é trabalho mesmo, mas paga em dólar e dá para fazer de casa.
 
 A demanda por vídeos de pessoas reais para treinar IA está explodindo. Empresas de robótica e carros autônomos precisam desses dados.
@@ -67,7 +63,6 @@ Não é esquema pirâmide, é trabalho mesmo. Só que pouca gente sabe que essa 
   {
     subreddit: "r/homeoffice",
     title: "Trabalho home office pelo celular: gravando vídeos para IA",
-    url: "https://reddit.com/r/homeoffice/submit?title=" + encodeURIComponent("Trabalho home office pelo celular: gravando vídeos para IA"),
     text: `Pessoal, trabalho home office há anos e recentemente descobri uma nova oportunidade: gravar vídeos para treinamento de IA.
 
 A empresa precisa de vídeos reais de pessoas fazendo tarefas do dia a dia. Você grava com o celular, em primeira pessoa, e recebe por hora aprovada.
@@ -179,8 +174,8 @@ export default function CompartilharPage() {
 
   function openReddit(post: typeof REDDIT_POSTS[0]) {
     const fullText = post.text + "\n\n" + SITE_URL;
-    copyToClipboard(fullText, `reddit-${post.subreddit}`);
-    window.open(post.url, "_blank");
+    const redditUrl = `https://www.reddit.com/${post.subreddit.replace("r/", "")}/submit?title=${encodeURIComponent(post.title)}&selftext=${encodeURIComponent(fullText)}`;
+    window.open(redditUrl, "_blank");
   }
 
   return (
@@ -217,7 +212,7 @@ export default function CompartilharPage() {
           {activeTab === "reddit" && (
             <div className={styles.postsList}>
               <h2>Posts para Reddit</h2>
-              <p className={styles.hint}>Clique em &quot;Copiar e Abrir Reddit&quot; — o texto é copiado e o Reddit abre numa nova aba. Basta colar e publicar!</p>
+              <p className={styles.hint}>Clique em &quot;Abrir Reddit&quot; — o Reddit abre com título e texto já preenchidos. Basta revisar e publicar!</p>
               {REDDIT_POSTS.map((post, i) => (
                 <div key={i} className={styles.postCard}>
                   <div className={styles.postHeader}>
@@ -229,7 +224,7 @@ export default function CompartilharPage() {
                       {copiedIdx === `reddit-${i}` ? "✓ Copiado!" : "Copiar texto"}
                     </button>
                     <button className="btn btn-primary" onClick={() => openReddit(post)}>
-                      Copiar e Abrir Reddit →
+                      Abrir Reddit com post preenchido →
                     </button>
                   </div>
                 </div>
