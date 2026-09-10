@@ -174,7 +174,7 @@ export default function CompartilharPage() {
 
   function openReddit(post: typeof REDDIT_POSTS[0]) {
     const fullText = post.text + "\n\n" + SITE_URL;
-    const redditUrl = `https://www.reddit.com/${post.subreddit.replace("r/", "")}/submit?title=${encodeURIComponent(post.title)}&selftext=${encodeURIComponent(fullText)}`;
+    const redditUrl = `https://www.reddit.com/${post.subreddit}/submit?title=${encodeURIComponent(post.title)}&selftext=${encodeURIComponent(fullText)}`;
     window.open(redditUrl, "_blank");
   }
 
