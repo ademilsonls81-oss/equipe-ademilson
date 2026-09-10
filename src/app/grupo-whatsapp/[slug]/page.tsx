@@ -115,6 +115,127 @@ const PAGES: Record<string, { title: string; description: string; h1: string; be
       "Pagamento rápido",
     ],
   },
+  "rio-de-janeiro": {
+    title: "Grupo WhatsApp Rio de Janeiro | Renda Extra",
+    description: "Grupo WhatsApp no Rio de Janeiro com oportunidades de renda extra. Gravação de vídeos para IA com pagamento em dólar.",
+    h1: "Grupo WhatsApp do Rio de Janeiro",
+    benefits: [
+      "Oportunidades para cariocas",
+      "Trabalho remoto pelo celular",
+      "Renda extra sem sair de casa",
+      "Comunidade ativa no RJ",
+    ],
+  },
+  "belo-horizonte": {
+    title: "Grupo WhatsApp Belo Horizonte | Vagas",
+    description: "Grupo WhatsApp em Belo Horizonte com vagas de trabalho remoto e renda extra com gravação de vídeos para IA.",
+    h1: "Grupo WhatsApp de Belo Horizonte",
+    benefits: [
+      "Oportunidades para mineiros",
+      "Renda extra com o celular",
+      "Projetos de gravação de vídeos",
+      "Sem taxa de participação",
+    ],
+  },
+  "curitiba": {
+    title: "Grupo WhatsApp Curitiba | Oportunidades",
+    description: "Grupo WhatsApp em Curitiba com oportunidades de ganho pelo celular. Gravação de vídeos para treinamento de IA.",
+    h1: "Grupo WhatsApp de Curitiba",
+    benefits: [
+      "Oportunidades para paranaenses",
+      "Trabalho remoto e flexível",
+      "Pagamento em dólar",
+      "Sem experiência necessária",
+    ],
+  },
+  "salvador": {
+    title: "Grupo WhatsApp Salvador | Renda Extra",
+    description: "Grupo WhatsApp em Salvador com oportunidades de renda extra. Gravação de vídeos para IA com pagamento em dólar.",
+    h1: "Grupo WhatsApp de Salvador",
+    benefits: [
+      "Oportunidades para baianos",
+      "Trabalho remoto pelo celular",
+      "Renda extra sem investimento",
+      "Comunidade ativa em Salvador",
+    ],
+  },
+  "brasilia": {
+    title: "Grupo WhatsApp Brasília | Vagas Remotas",
+    description: "Grupo WhatsApp em Brasília com vagas de trabalho remoto. Oportunidades de gravação de vídeos para IA.",
+    h1: "Grupo WhatsApp de Brasília",
+    benefits: [
+      "Oportunidades para candangos",
+      "Trabalho remoto e flexível",
+      "Pagamento em dólar",
+      "Sem experiência necessária",
+    ],
+  },
+  "fortaleza": {
+    title: "Grupo WhatsApp Fortaleza | Renda Extra",
+    description: "Grupo WhatsApp em Fortaleza com oportunidades de renda extra. Gravação de vídeos para IA com pagamento em dólar.",
+    h1: "Grupo WhatsApp de Fortaleza",
+    benefits: [
+      "Oportunidades para cearenses",
+      "Trabalho remoto pelo celular",
+      "Renda extra sem investimento",
+      "Comunidade ativa em Fortaleza",
+    ],
+  },
+  "manaus": {
+    title: "Grupo WhatsApp Manaus | Oportunidades",
+    description: "Grupo WhatsApp em Manaus com oportunidades de ganho pelo celular. Gravação de vídeos para treinamento de IA.",
+    h1: "Grupo WhatsApp de Manaus",
+    benefits: [
+      "Oportunidades para amazonenses",
+      "Trabalho remoto e flexível",
+      "Pagamento em dólar",
+      "Sem experiência necessária",
+    ],
+  },
+  "recife": {
+    title: "Grupo WhatsApp Recife | Renda Extra",
+    description: "Grupo WhatsApp em Recife com oportunidades de renda extra. Gravação de vídeos para IA com pagamento em dólar.",
+    h1: "Grupo WhatsApp de Recife",
+    benefits: [
+      "Oportunidades para pernambucanos",
+      "Trabalho remoto pelo celular",
+      "Renda extra sem investimento",
+      "Comunidade ativa em Recife",
+    ],
+  },
+  "porto-alegre": {
+    title: "Grupo WhatsApp Porto Alegre | Vagas",
+    description: "Grupo WhatsApp em Porto Alegre com vagas de trabalho remoto. Oportunidades de gravação de vídeos para IA.",
+    h1: "Grupo WhatsApp de Porto Alegre",
+    benefits: [
+      "Oportunidades para gaúchos",
+      "Trabalho remoto e flexível",
+      "Pagamento em dólar",
+      "Sem experiência necessária",
+    ],
+  },
+  "video-ia": {
+    title: "Grupo WhatsApp Gravação de Vídeos para IA",
+    description: "Entre no grupo de gravação de vídeos para treinamento de Inteligência Artificial. Cadastro gratuito, pagamento em dólar.",
+    h1: "Grupo de Gravação de Vídeos para IA",
+    benefits: [
+      "Grave vídeos do dia a dia",
+      "Receba em dólar por hora aprovada",
+      "Sem experiência necessária",
+      "Trabalhe de casa com o celular",
+    ],
+  },
+  "ganhos": {
+    title: "Como Ganhar Dinheiro com Vídeos | Grupo WhatsApp",
+    description: "Aprenda como ganhar dinheiro gravando vídeos para IA. Grupo WhatsApp com dicas e orientações gratuitas.",
+    h1: "Como Ganhar Dinheiro com Vídeos para IA",
+    benefits: [
+      "Método comprovado e gratuito",
+      "Pagamento em dólar por hora",
+      "Sem investimento inicial",
+      "Trabalhe de qualquer lugar",
+    ],
+  },
 };
 
 export async function generateStaticParams() {

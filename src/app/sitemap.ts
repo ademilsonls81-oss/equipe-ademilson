@@ -16,6 +16,35 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/privacidade`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.3 },
   ];
 
+  const seoPages = [
+    "renda-extra",
+    "empregos",
+    "oportunidades",
+    "cursos-gratuitos",
+    "trabalho-casa",
+    "celular",
+    "suzano",
+    "sao-paulo",
+    "emprego-remoto",
+    "dinheiro-facil",
+    "rio-de-janeiro",
+    "belo-horizonte",
+    "curitiba",
+    "salvador",
+    "brasilia",
+    "fortaleza",
+    "manaus",
+    "recife",
+    "porto-alegre",
+    "video-ia",
+    "ganhos",
+  ].map((slug) => ({
+    url: `${baseUrl}/grupo-whatsapp/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: "weekly" as const,
+    priority: 0.8,
+  }));
+
   const blogPages = blogPosts.map((post) => ({
     url: `${baseUrl}/blog/${post.slug}`,
     lastModified: new Date(post.updatedAt || post.publishedAt),
@@ -23,5 +52,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...blogPages];
+  return [...staticPages, ...seoPages, ...blogPages];
 }
