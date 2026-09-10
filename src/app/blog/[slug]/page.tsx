@@ -65,7 +65,7 @@ function renderMarkdown(content: string) {
       if (inList) { html.push("</ul>"); inList = false; }
       const p = trimmed
         .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="${styles.link}">$1</a>');
+        .replace(/\[(.*?)\]\((.*?)\)/g, `<a href="$2" class="${styles.link}">$1</a>`);
       html.push(`<p class="${styles.p}">${p}</p>`);
     }
   }
