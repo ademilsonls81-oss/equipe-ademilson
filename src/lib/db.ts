@@ -581,7 +581,9 @@ export function createAgentLog(data: {
   db.prepare(`INSERT INTO agent_logs (agent_type, action, details, status, error_message)
     VALUES (@agent_type, @action, @details, @status, @error_message)`).run({
     ...data,
+    details: data.details || null,
     status: data.status || "success",
+    error_message: data.error_message || null,
   });
 }
 
