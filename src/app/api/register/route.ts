@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRegistration, createReferralCode, getReferralCode } from "@/lib/db";
+import { createRegistration, createReferralCode, getReferralCode, linkSessionToRegistration } from "@/lib/db";
 import { generateUid, generateReferralCode } from "@/lib/utils";
 
 const STATES = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
@@ -7,7 +7,7 @@ const STATES = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, whatsapp, city, state, age_range, has_smartphone, has_support, how_found, ref, utm_source, utm_medium, utm_campaign } = body;
+    const { name, whatsapp, city, state, age_range, has_smartphone, has_support, how_found, ref, utm_source, utm_medium, utm_campaign, session_id } = body;
 
     if (!name || !whatsapp || !city || !state || !age_range || !has_smartphone || !has_support || !how_found)
       return NextResponse.json({ error: "Campos obrigatórios faltando." }, { status: 400 });
@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
 
     const myCode = generateReferralCode(name);
     createReferralCode(uid, myCode);
+
+    if (session_id) {
+      linkSessionToRegistration(session_id, uid);
+    }
 
     return NextResponse.json({ success: true, uid, referral_code: myCode });
   } catch (e: any) {

@@ -70,19 +70,26 @@ export default function RegisterForm({ refCode }: { refCode?: string }) {
     if (err) { setErrorMsg(err); setStatus("error"); return; }
     setStatus("loading"); setErrorMsg("");
     try {
+      const sessionId = typeof window !== "undefined" ? sessionStorage.getItem("ea_session") || "" : "";
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, ref: refCode, ...utmParams }),
+        body: JSON.stringify({ ...form, ref: refCode, ...utmParams, session_id: sessionId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao cadastrar.");
       setMyCode(data.referral_code || "");
       setStatus("success");
-      if (typeof window !== "undefined" && (window as any).gtag)
-        (window as any).gtag("event", "form_submit", { event_label: "register_success" });
-      if (typeof window !== "undefined" && (window as any).fbq)
-        (window as any).fbq("track", "Lead");
+      if (typeof window !== "undefined") {
+        if ((window as any).gtag) {
+          (window as any).gtag("event", "form_submit", { event_label: "register_success" });
+          (window as any).gtag("event", "generate_lead", { event_label: "register" });
+        }
+        if ((window as any).fbq) {
+          (window as any).fbq("track", "Lead");
+          (window as any).fbq("track", "CompleteRegistration");
+        }
+      }
     } catch (e: any) {
       setErrorMsg(e.message || "Erro ao enviar. Tente novamente.");
       setStatus("error");

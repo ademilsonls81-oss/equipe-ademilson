@@ -14,11 +14,21 @@ interface Props {
 
 export default function WhatsAppButton({ label = "Entrar na Equipe pelo WhatsApp", className = "", eventLabel }: Props) {
   function handleClick() {
-    if (typeof window !== "undefined" && (window as any).gtag) {
-      (window as any).gtag("event", "click_whatsapp", { event_label: eventLabel || label });
-    }
-    if (typeof window !== "undefined" && (window as any).fbq) {
-      (window as any).fbq("track", "Contact");
+    if (typeof window !== "undefined") {
+      if ((window as any).gtag) {
+        (window as any).gtag("event", "click_whatsapp", { event_label: eventLabel || label });
+      }
+      if ((window as any).fbq) {
+        (window as any).fbq("track", "Contact");
+      }
+      const sid = sessionStorage.getItem("ea_session");
+      if (sid) {
+        fetch("/api/pageview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sid, event: "whatsapp_click" }),
+        }).catch(() => {});
+      }
     }
   }
 

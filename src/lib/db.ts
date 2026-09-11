@@ -45,6 +45,24 @@ function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_reg_created ON registrations(created_at);
     CREATE INDEX IF NOT EXISTS idx_ref_code ON referral_codes(code);
     CREATE INDEX IF NOT EXISTS idx_reg_refcode ON registrations(referral_code);
+    CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT UNIQUE NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      referrer TEXT,
+      landing_page TEXT,
+      utm_source TEXT,
+      utm_medium TEXT,
+      utm_campaign TEXT,
+      registered_uid TEXT,
+      clicked_whatsapp INTEGER DEFAULT 0,
+      joined_whatsapp INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (registered_uid) REFERENCES registrations(uid)
+    );
+    CREATE INDEX IF NOT EXISTS idx_sess_id ON sessions(session_id);
+    CREATE INDEX IF NOT EXISTS idx_sess_uid ON sessions(registered_uid);
   `);
   return _db;
 }
@@ -135,6 +153,69 @@ export function getTopReferrers(limit: number = 10) {
     ORDER BY referrals_count DESC
     LIMIT ?
   `).all(limit) as { code: string; name: string; city: string; state: string; referrals_count: number }[];
+}
+
+export function createSession(data: {
+  session_id: string;
+  ip_address?: string;
+  user_agent?: string;
+  referrer?: string;
+  landing_page?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT OR IGNORE INTO sessions (session_id, ip_address, user_agent, referrer, landing_page, utm_source, utm_medium, utm_campaign)
+    VALUES (@session_id, @ip_address, @user_agent, @referrer, @landing_page, @utm_source, @utm_medium, @utm_campaign)`).run(data);
+}
+
+export function linkSessionToRegistration(sessionId: string, uid: string) {
+  const db = getDb();
+  db.prepare("UPDATE sessions SET registered_uid = ? WHERE session_id = ?").run(uid, sessionId);
+}
+
+export function markSessionClickedWhatsApp(sessionId: string) {
+  const db = getDb();
+  db.prepare("UPDATE sessions SET clicked_whatsapp = 1 WHERE session_id = ?").run(sessionId);
+}
+
+export function markSessionJoinedWhatsApp(sessionId: string) {
+  const db = getDb();
+  db.prepare("UPDATE sessions SET joined_whatsapp = 1 WHERE session_id = ?").run(sessionId);
+}
+
+export function getFunnelStats() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+
+  const totalSessions = (db.prepare("SELECT COUNT(*) as c FROM sessions").get() as any).c;
+  const sessionsToday = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE date(created_at) = ?").get(today) as any).c;
+  const registered = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE registered_uid IS NOT NULL").get() as any).c;
+  const registeredToday = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE registered_uid IS NOT NULL AND date(created_at) = ?").get(today) as any).c;
+  const clickedWhatsApp = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE clicked_whatsapp = 1").get() as any).c;
+  const joinedWhatsApp = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE joined_whatsapp = 1").get() as any).c;
+
+  const bySource = db.prepare(
+    "SELECT utm_source as source, COUNT(*) as sessions, SUM(CASE WHEN registered_uid IS NOT NULL THEN 1 ELSE 0 END) as registrations FROM sessions WHERE utm_source IS NOT NULL GROUP BY utm_source ORDER BY sessions DESC"
+  ).all() as { source: string; sessions: number; registrations: number }[];
+
+  const byLandingPage = db.prepare(
+    "SELECT landing_page, COUNT(*) as sessions, SUM(CASE WHEN registered_uid IS NOT NULL THEN 1 ELSE 0 END) as registrations FROM sessions WHERE landing_page IS NOT NULL GROUP BY landing_page ORDER BY sessions DESC LIMIT 10"
+  ).all() as { landing_page: string; sessions: number; registrations: number }[];
+
+  return {
+    totalSessions,
+    sessionsToday,
+    registered,
+    registeredToday,
+    clickedWhatsApp,
+    joinedWhatsApp,
+    conversionRate: totalSessions > 0 ? Math.round((registered / totalSessions) * 100) : 0,
+    whatsappRate: registered > 0 ? Math.round((clickedWhatsApp / registered) * 100) : 0,
+    bySource,
+    byLandingPage,
+  };
 }
 
 export function getAnalytics() {

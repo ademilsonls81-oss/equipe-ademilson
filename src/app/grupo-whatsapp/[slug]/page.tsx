@@ -566,11 +566,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const page = PAGES[slug];
   if (!page) return {};
 
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
+
   return {
     title: page.title,
     description: page.description,
     alternates: {
-      canonical: `${process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app"}/grupo-whatsapp/${slug}`,
+      canonical: `${baseUrl}/grupo-whatsapp/${slug}`,
     },
     openGraph: {
       title: page.title,
@@ -599,6 +601,42 @@ export default async function GrupoWhatsAppPage({ params }: { params: Promise<{ 
       <div className={styles.bgOrb1} />
       <div className={styles.bgOrb2} />
 
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: [
+              {
+                "@type": "Question",
+                name: "Como entrar no grupo WhatsApp?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Clique no botão acima para entrar gratuitamente no grupo. Você será redirecionado para o WhatsApp e poderá participar imediatamente.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "É gratuito participar?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Sim, 100% gratuito. Não há taxas de participação ou cadastro.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "Precisa de experiência?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Não. Qualquer pessoa pode participar. Basta ter um smartphone com câmera.",
+                },
+              },
+            ],
+          }),
+        }}
+      />
+
       <div className={`container ${styles.content}`}>
         <span className="section-tag">Grupo WhatsApp</span>
 
@@ -625,6 +663,22 @@ export default async function GrupoWhatsAppPage({ params }: { params: Promise<{ 
             ENTRAR NO GRUPO DO WHATSAPP
           </a>
           <p className={styles.ctaHint}>✅ 100% Gratuito — Sem taxas</p>
+        </div>
+
+        <div className={`${styles.faq} fade-up delay-4`}>
+          <h2>Perguntas Frequentes</h2>
+          <div className={styles.faqItem}>
+            <h3>Como entrar no grupo WhatsApp?</h3>
+            <p>Clique no botão acima para entrar gratuitamente no grupo. Você será redirecionado para o WhatsApp e poderá participar imediatamente.</p>
+          </div>
+          <div className={styles.faqItem}>
+            <h3>É gratuito participar?</h3>
+            <p>Sim, 100% gratuito. Não há taxas de participação ou cadastro.</p>
+          </div>
+          <div className={styles.faqItem}>
+            <h3>Precisa de experiência?</h3>
+            <p>Não. Qualquer pessoa pode participar. Basta ter um smartphone com câmera.</p>
+          </div>
         </div>
 
         <div className={`${styles.extraLinks} fade-up delay-4`}>
