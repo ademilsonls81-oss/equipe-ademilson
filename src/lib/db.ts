@@ -136,6 +136,77 @@ function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_as_date ON acquisition_score(date);
     CREATE INDEX IF NOT EXISTS idx_as_platform ON acquisition_score(platform);
+    CREATE TABLE IF NOT EXISTS content_topics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      topic_id TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      category TEXT NOT NULL,
+      relevance INTEGER DEFAULT 50,
+      traffic_potential INTEGER DEFAULT 50,
+      conversion_potential INTEGER DEFAULT 50,
+      priority INTEGER DEFAULT 50,
+      status TEXT DEFAULT 'active',
+      tags TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_ct_category ON content_topics(category);
+    CREATE INDEX IF NOT EXISTS idx_ct_status ON content_topics(status);
+    CREATE INDEX IF NOT EXISTS idx_ct_priority ON content_topics(priority);
+    CREATE TABLE IF NOT EXISTS content_drafts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      draft_id TEXT UNIQUE NOT NULL,
+      topic_id TEXT,
+      title TEXT NOT NULL,
+      description TEXT,
+      body TEXT,
+      platform TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      cta TEXT,
+      destination_url TEXT,
+      utm_source TEXT,
+      utm_medium TEXT DEFAULT 'social',
+      utm_campaign TEXT,
+      utm_content TEXT,
+      version INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'ideia',
+      scheduled_at DATETIME,
+      published_at DATETIME,
+      result TEXT,
+      score REAL DEFAULT 0,
+      sessions INTEGER DEFAULT 0,
+      registrations INTEGER DEFAULT 0,
+      whatsapp_clicks INTEGER DEFAULT 0,
+      referrals INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cd_platform ON content_drafts(platform);
+    CREATE INDEX IF NOT EXISTS idx_cd_status ON content_drafts(status);
+    CREATE INDEX IF NOT EXISTS idx_cd_topic ON content_drafts(topic_id);
+    CREATE INDEX IF NOT EXISTS idx_cd_utm ON content_drafts(utm_campaign);
+    CREATE TABLE IF NOT EXISTS content_schedule (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      schedule_id TEXT UNIQUE NOT NULL,
+      draft_id TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      scheduled_for DATETIME NOT NULL,
+      status TEXT DEFAULT 'pending',
+      published_at DATETIME,
+      error TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cs_platform ON content_schedule(platform);
+    CREATE INDEX IF NOT EXISTS idx_cs_status ON content_schedule(status);
+    CREATE TABLE IF NOT EXISTS agent_limits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT NOT NULL,
+      daily_limit INTEGER DEFAULT 5,
+      current_count INTEGER DEFAULT 0,
+      last_reset DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(platform)
+    );
     CREATE TABLE IF NOT EXISTS referral_tracking (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       referrer_uid TEXT NOT NULL,
@@ -1186,6 +1257,195 @@ export function toggleAutonomousMode(enabled: boolean) {
     details: `Modo autônomo ${enabled ? "ativado" : "desativado"}`,
     status: "success",
   });
+}
+
+export function createTopic(data: {
+  topic_id: string;
+  title: string;
+  description?: string;
+  category: string;
+  relevance?: number;
+  traffic_potential?: number;
+  conversion_potential?: number;
+  priority?: number;
+  tags?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT OR IGNORE INTO content_topics (topic_id, title, description, category, relevance, traffic_potential, conversion_potential, priority, tags)
+    VALUES (@topic_id, @title, @description, @category, @relevance, @traffic_potential, @conversion_potential, @priority, @tags)`).run({
+    ...data,
+    description: data.description || null,
+    relevance: data.relevance || 50,
+    traffic_potential: data.traffic_potential || 50,
+    conversion_potential: data.conversion_potential || 50,
+    priority: data.priority || 50,
+    tags: data.tags || null,
+  });
+}
+
+export function getTopics(status?: string) {
+  const db = getDb();
+  if (status) {
+    return db.prepare("SELECT * FROM content_topics WHERE status = ? ORDER BY priority DESC, created_at DESC").all(status) as any[];
+  }
+  return db.prepare("SELECT * FROM content_topics ORDER BY priority DESC, created_at DESC").all() as any[];
+}
+
+export function updateTopicStatus(topicId: string, status: string) {
+  const db = getDb();
+  db.prepare("UPDATE content_topics SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE topic_id = ?").run(status, topicId);
+}
+
+export function createDraft(data: {
+  draft_id: string;
+  topic_id?: string;
+  title: string;
+  description?: string;
+  body?: string;
+  platform: string;
+  content_type: string;
+  cta?: string;
+  destination_url?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_content?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT INTO content_drafts (draft_id, topic_id, title, description, body, platform, content_type, cta, destination_url, utm_source, utm_medium, utm_campaign, utm_content)
+    VALUES (@draft_id, @topic_id, @title, @description, @body, @platform, @content_type, @cta, @destination_url, @utm_source, @utm_medium, @utm_campaign, @utm_content)`).run({
+    ...data,
+    topic_id: data.topic_id || null,
+    description: data.description || null,
+    body: data.body || null,
+    cta: data.cta || null,
+    destination_url: data.destination_url || null,
+    utm_source: data.utm_source || data.platform,
+    utm_medium: data.utm_medium || "social",
+    utm_campaign: data.utm_campaign || "content_engine",
+    utm_content: data.utm_content || data.draft_id,
+  });
+}
+
+export function getDrafts(filters?: { platform?: string; status?: string; limit?: number }) {
+  const db = getDb();
+  let query = "SELECT * FROM content_drafts WHERE 1=1";
+  const params: any[] = [];
+  if (filters?.platform) { query += " AND platform = ?"; params.push(filters.platform); }
+  if (filters?.status) { query += " AND status = ?"; params.push(filters.status); }
+  query += " ORDER BY created_at DESC";
+  if (filters?.limit) { query += " LIMIT ?"; params.push(filters.limit); }
+  return db.prepare(query).all(...params) as any[];
+}
+
+export function updateDraft(draftId: string, data: Record<string, any>) {
+  const db = getDb();
+  const allowed = ["title", "description", "body", "cta", "status", "scheduled_at", "published_at", "result", "score", "sessions", "registrations", "whatsapp_clicks", "referrals"];
+  const updates: string[] = [];
+  const values: any[] = [];
+  Object.entries(data).forEach(([key, value]) => {
+    if (allowed.includes(key)) { updates.push(`${key} = ?`); values.push(value); }
+  });
+  if (updates.length === 0) return;
+  updates.push("updated_at = CURRENT_TIMESTAMP");
+  values.push(draftId);
+  db.prepare(`UPDATE content_drafts SET ${updates.join(", ")} WHERE draft_id = ?`).run(...values);
+}
+
+export function getDraftStats() {
+  const db = getDb();
+  const total = (db.prepare("SELECT COUNT(*) as c FROM content_drafts").get() as any).c;
+  const byStatus = db.prepare("SELECT status, COUNT(*) as count FROM content_drafts GROUP BY status ORDER BY count DESC").all() as { status: string; count: number }[];
+  const byPlatform = db.prepare("SELECT platform, COUNT(*) as count FROM content_drafts GROUP BY platform ORDER BY count DESC").all() as { platform: string; count: number }[];
+  const totalSessions = (db.prepare("SELECT COALESCE(SUM(sessions), 0) as c FROM content_drafts").get() as any).c;
+  const totalRegistrations = (db.prepare("SELECT COALESCE(SUM(registrations), 0) as c FROM content_drafts").get() as any).c;
+  const totalWhatsapp = (db.prepare("SELECT COALESCE(SUM(whatsapp_clicks), 0) as c FROM content_drafts").get() as any).c;
+  const totalReferrals = (db.prepare("SELECT COALESCE(SUM(referrals), 0) as c FROM content_drafts").get() as any).c;
+  const winners = db.prepare("SELECT * FROM content_drafts WHERE status = 'vencedor' ORDER BY score DESC LIMIT 5").all() as any[];
+  const losers = db.prepare("SELECT * FROM content_drafts WHERE status = 'fraco' OR (sessions > 50 AND registrations < 2) ORDER BY score ASC LIMIT 5").all() as any[];
+  return { total, byStatus, byPlatform, totalSessions, totalRegistrations, totalWhatsapp, totalReferrals, winners, losers };
+}
+
+export function scheduleContent(draftId: string, scheduledFor: string) {
+  const db = getDb();
+  const draft = db.prepare("SELECT * FROM content_drafts WHERE draft_id = ?").get(draftId) as any;
+  if (!draft) return null;
+  const scheduleId = "SCH" + Date.now().toString(36).toUpperCase();
+  db.prepare(`INSERT INTO content_schedule (schedule_id, draft_id, platform, scheduled_for) VALUES (?, ?, ?, ?)`).run(scheduleId, draftId, draft.platform, scheduledFor);
+  updateDraft(draftId, { status: "agendado", scheduled_at: scheduledFor });
+  return scheduleId;
+}
+
+export function getSchedule() {
+  const db = getDb();
+  return db.prepare(`SELECT cs.*, cd.title, cd.utm_campaign FROM content_schedule cs JOIN content_drafts cd ON cd.draft_id = cs.draft_id ORDER BY cs.scheduled_for ASC`).all() as any[];
+}
+
+export function checkPlatformLimit(platform: string): { allowed: boolean; current: number; limit: number } {
+  const db = getDb();
+  const limit = db.prepare("SELECT * FROM agent_limits WHERE platform = ?").get(platform) as any;
+  const dailyLimit = limit?.daily_limit || 5;
+  const today = new Date().toISOString().split("T")[0];
+  const current = (db.prepare("SELECT COUNT(*) as c FROM content_drafts WHERE platform = ? AND status = 'publicado' AND date(published_at) = ?").get(platform, today) as any).c;
+  return { allowed: current < dailyLimit, current, limit: dailyLimit };
+}
+
+export function setPlatformLimit(platform: string, dailyLimit: number) {
+  const db = getDb();
+  db.prepare("INSERT OR REPLACE INTO agent_limits (platform, daily_limit) VALUES (?, ?)").run(platform, dailyLimit);
+}
+
+export function getContentEngineDashboard() {
+  const db = getDb();
+  const topicStats = {
+    total: (db.prepare("SELECT COUNT(*) as c FROM content_topics").get() as any).c,
+    active: (db.prepare("SELECT COUNT(*) as c FROM content_topics WHERE status = 'active'").get() as any).c,
+    used: (db.prepare("SELECT COUNT(*) as c FROM content_topics WHERE status = 'used'").get() as any).c,
+  };
+  const draftStats = getDraftStats();
+  const schedule = getSchedule();
+  const platformLimits: Record<string, { allowed: boolean; current: number; limit: number }> = {};
+  ["google", "youtube", "tiktok", "instagram", "facebook", "pinterest", "reddit"].forEach(p => {
+    platformLimits[p] = checkPlatformLimit(p);
+  });
+  const recentActivity = db.prepare("SELECT * FROM content_drafts ORDER BY updated_at DESC LIMIT 10").all() as any[];
+  const topPerformers = db.prepare("SELECT * FROM content_drafts WHERE sessions > 0 ORDER BY score DESC LIMIT 5").all() as any[];
+  return { topicStats, draftStats, schedule, platformLimits, recentActivity, topPerformers };
+}
+
+export function generateContentForTopic(topicId: string, platform: string) {
+  const db = getDb();
+  const topic = db.prepare("SELECT * FROM content_topics WHERE topic_id = ?").get(topicId) as any;
+  if (!topic) return null;
+  const draftId = "DFT" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+  const templates: Record<string, { title: string; body: string; cta: string; content_type: string }> = {
+    google: { title: `${topic.title} - Guia Completo [2026]`, body: `Descubra tudo sobre ${topic.title}. ${topic.description || ""}`, cta: "Saiba Mais", content_type: "blog" },
+    youtube: { title: `${topic.title} - Explicação Completa`, body: `Neste vídeo, explicamos ${topic.title.toLowerCase()}. ${topic.description || ""}`, cta: "Inscreva-se", content_type: "video" },
+    tiktok: { title: `${topic.title} em 60 segundos`, body: `${topic.title}: ${topic.description || "Tudo que você precisa saber"}`, cta: "Siga para mais", content_type: "video" },
+    instagram: { title: `${topic.title} 📱`, body: `${topic.title}\n\n${topic.description || ""}\n\nSalve para consultar depois!`, cta: "Link na bio", content_type: "post" },
+    facebook: { title: `${topic.title} - Saiba Mais`, body: `Interessado em ${topic.title.toLowerCase()}? ${topic.description || ""}`, cta: "Clique aqui", content_type: "post" },
+    pinterest: { title: `${topic.title} - Infográfico`, body: `${topic.title}: ${topic.description || "Guia completo"}`, cta: "Ver mais", content_type: "pin" },
+    reddit: { title: `[Discussão] ${topic.title}`, body: `Pessoal, o que acham sobre ${topic.title.toLowerCase()}? ${topic.description || ""}`, cta: "Comente", content_type: "post" },
+  };
+  const template = templates[platform] || templates.google;
+  const utmCampaign = `ce-${topic.category}-${platform}`;
+  const utmContent = draftId.toLowerCase();
+  createDraft({
+    draft_id: draftId,
+    topic_id: topicId,
+    title: template.title,
+    description: topic.description,
+    body: template.body,
+    platform,
+    content_type: template.content_type,
+    cta: template.cta,
+    destination_url: "https://equipe-ademilson.vercel.app",
+    utm_source: platform,
+    utm_medium: "social",
+    utm_campaign: utmCampaign,
+    utm_content: utmContent,
+  });
+  return draftId;
 }
 
 export default getDb;

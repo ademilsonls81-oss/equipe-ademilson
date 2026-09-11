@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     if (session_id) {
       createSession({
         session_id,
-        ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || null,
+        ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined,
         landing_page: "/cadastro",
         utm_source: utm_source || url.searchParams.get("utm_source") || undefined,
         utm_medium: utm_medium || url.searchParams.get("utm_medium") || undefined,
