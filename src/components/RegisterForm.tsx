@@ -23,10 +23,20 @@ export default function RegisterForm({ refCode }: { refCode?: string }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [myCode, setMyCode] = useState("");
   const [touched, setTouched] = useState<Partial<Record<keyof FormData, boolean>>>({});
+  const [utmParams, setUtmParams] = useState<{ utm_source?: string; utm_medium?: string; utm_campaign?: string }>({});
 
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).gtag)
-      (window as any).gtag("event", "form_start");
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const utm = {
+        utm_source: params.get("utm_source") || undefined,
+        utm_medium: params.get("utm_medium") || undefined,
+        utm_campaign: params.get("utm_campaign") || undefined,
+      };
+      setUtmParams(utm);
+      if ((window as any).gtag)
+        (window as any).gtag("event", "form_start");
+    }
   }, []);
 
   function set(key: keyof FormData, value: string | boolean) {
@@ -63,7 +73,7 @@ export default function RegisterForm({ refCode }: { refCode?: string }) {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, ref: refCode }),
+        body: JSON.stringify({ ...form, ref: refCode, ...utmParams }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao cadastrar.");

@@ -137,4 +137,58 @@ export function getTopReferrers(limit: number = 10) {
   `).all(limit) as { code: string; name: string; city: string; state: string; referrals_count: number }[];
 }
 
+export function getAnalytics() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+
+  const total = getCount();
+  const joinedToday = (db.prepare(
+    "SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = ?"
+  ).get(today) as any).c;
+  const joinedYesterday = (db.prepare(
+    "SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now','-1 day')"
+  ).get() as any).c;
+
+  const bySource = db.prepare(
+    "SELECT utm_source as source, COUNT(*) as count FROM registrations WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY count DESC"
+  ).all() as { source: string; count: number }[];
+
+  const byCampaign = db.prepare(
+    "SELECT utm_campaign as campaign, COUNT(*) as count FROM registrations WHERE utm_campaign IS NOT NULL AND utm_campaign != '' GROUP BY utm_campaign ORDER BY count DESC"
+  ).all() as { campaign: string; count: number }[];
+
+  const byHowFound = db.prepare(
+    "SELECT how_found, COUNT(*) as count FROM registrations GROUP BY how_found ORDER BY count DESC"
+  ).all() as { how_found: string; count: number }[];
+
+  const last7Days = db.prepare(
+    "SELECT date(created_at) as day, COUNT(*) as count FROM registrations WHERE created_at >= datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day"
+  ).all() as { day: string; count: number }[];
+
+  const referralsToday = (db.prepare(
+    `SELECT COUNT(*) as c FROM registrations r
+     JOIN referral_codes rc ON r.referral_code = rc.code
+     WHERE date(r.created_at) = ?`
+  ).get(today) as any).c;
+
+  const referralsTotal = (db.prepare(
+    "SELECT COUNT(*) as c FROM registrations WHERE referral_code IS NOT NULL AND referral_code != ''"
+  ).get() as any).c;
+
+  return {
+    total,
+    joinedToday,
+    joinedYesterday,
+    growth: joinedToday,
+    bySource,
+    byCampaign,
+    byHowFound,
+    last7Days,
+    referralsToday,
+    referralsTotal,
+    bestCampaign: byCampaign[0] || null,
+    bestSource: bySource[0] || null,
+  };
+}
+
 export default getDb;

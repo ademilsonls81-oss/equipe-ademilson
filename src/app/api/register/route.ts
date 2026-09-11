@@ -7,14 +7,14 @@ const STATES = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, whatsapp, city, state, age_range, has_smartphone, has_support, how_found, ref } = body;
+    const { name, whatsapp, city, state, age_range, has_smartphone, has_support, how_found, ref, utm_source, utm_medium, utm_campaign } = body;
 
     if (!name || !whatsapp || !city || !state || !age_range || !has_smartphone || !has_support || !how_found)
-      return NextResponse.json({ error: "Campos obrigatÃ³rios faltando." }, { status: 400 });
+      return NextResponse.json({ error: "Campos obrigatórios faltando." }, { status: 400 });
     if (!STATES.includes(state))
-      return NextResponse.json({ error: "Estado invÃ¡lido." }, { status: 400 });
+      return NextResponse.json({ error: "Estado inválido." }, { status: 400 });
     if (whatsapp.replace(/\D/g,"").length < 10)
-      return NextResponse.json({ error: "WhatsApp invÃ¡lido." }, { status: 400 });
+      return NextResponse.json({ error: "WhatsApp inválido." }, { status: 400 });
 
     let referral_code: string | null = null;
     if (ref) {
@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
       uid, name: name.trim(), whatsapp: whatsapp.replace(/\D/g,""),
       city: city.trim(), state, age_range, has_smartphone, has_support, how_found,
       referral_code,
-      utm_source: url.searchParams.get("utm_source"),
-      utm_medium: url.searchParams.get("utm_medium"),
-      utm_campaign: url.searchParams.get("utm_campaign"),
+      utm_source: utm_source || url.searchParams.get("utm_source"),
+      utm_medium: utm_medium || url.searchParams.get("utm_medium"),
+      utm_campaign: utm_campaign || url.searchParams.get("utm_campaign"),
       ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || null,
     });
 
