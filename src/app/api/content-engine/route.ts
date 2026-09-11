@@ -7,6 +7,7 @@ import {
   generateContentForTopic, setPlatformLimit,
   createAgentLog, getAgentConfig, setAgentConfig,
   calculateWeightedScore, getLearningInsights, getAgentMode, setAgentMode, setMinDataThreshold,
+  getCampaignContents, getCampaignStats, updateCampaignContent, seedPrimeiraCampanha,
 } from "@/lib/db";
 
 export async function GET(request: Request) {
@@ -47,11 +48,21 @@ export async function GET(request: Request) {
     if (url.searchParams.get("learning") === "true") {
       return NextResponse.json(getLearningInsights());
     }
+    if (url.searchParams.get("learning_full") === "true") {
+      const insights = getLearningInsights();
+      return NextResponse.json(insights);
+    }
     if (url.searchParams.get("score") === "true") {
       return NextResponse.json(calculateWeightedScore());
     }
     if (url.searchParams.get("mode") === "true") {
       return NextResponse.json(getAgentMode());
+    }
+    if (url.searchParams.get("campaign") === "true") {
+      const campaignId = url.searchParams.get("campaign_id") || "primeiro-100-membros";
+      const contents = getCampaignContents(campaignId);
+      const stats = getCampaignStats(campaignId);
+      return NextResponse.json({ contents, stats });
     }
 
     return NextResponse.json(getContentEngineDashboard());
@@ -188,6 +199,20 @@ export async function POST(request: Request) {
       }
       setMinDataThreshold(threshold);
       return NextResponse.json({ ok: true, threshold });
+    }
+
+    if (action === "seed_campaign") {
+      const result = seedPrimeiraCampanha();
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (action === "update_campaign_content") {
+      const { campaign_id, content_index, platform, ...data } = body;
+      if (!campaign_id || content_index === undefined || !platform) {
+        return NextResponse.json({ error: "campaign_id, content_index, and platform required" }, { status: 400 });
+      }
+      updateCampaignContent(campaign_id, content_index, platform, data);
+      return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

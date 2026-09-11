@@ -267,6 +267,33 @@ function getDb(): Database.Database {
       config_value TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS campaign_contents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id TEXT NOT NULL,
+      content_index INTEGER NOT NULL,
+      platform TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      cta TEXT,
+      url TEXT,
+      utm_source TEXT,
+      utm_medium TEXT DEFAULT 'organic',
+      utm_campaign TEXT,
+      utm_content TEXT,
+      status TEXT DEFAULT 'pronto',
+      sessions INTEGER DEFAULT 0,
+      registrations INTEGER DEFAULT 0,
+      whatsapp_clicks INTEGER DEFAULT 0,
+      referrals INTEGER DEFAULT 0,
+      score REAL DEFAULT 0,
+      published_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cc_campaign ON campaign_contents(campaign_id);
+    CREATE INDEX IF NOT EXISTS idx_cc_platform ON campaign_contents(platform);
+    CREATE INDEX IF NOT EXISTS idx_cc_status ON campaign_contents(status);
+    CREATE INDEX IF NOT EXISTS idx_cc_content ON campaign_contents(content_index);
   `);
   return _db;
 }
@@ -1501,6 +1528,36 @@ export function calculateWeightedScore() {
     ORDER BY total_referrals DESC, total_whatsapp DESC, total_registrations DESC
   `).all(minData) as any[];
 
+  const byCTA = db.prepare(`
+    SELECT 
+      cta,
+      COUNT(*) as content_count,
+      COALESCE(SUM(sessions), 0) as total_sessions,
+      COALESCE(SUM(registrations), 0) as total_registrations,
+      COALESCE(SUM(whatsapp_clicks), 0) as total_whatsapp,
+      COALESCE(SUM(referrals), 0) as total_referrals
+    FROM content_drafts
+    WHERE status IN ('publicado', 'medindo', 'vencedor') AND cta IS NOT NULL AND cta != ''
+    GROUP BY cta
+    HAVING content_count >= ?
+    ORDER BY total_referrals DESC, total_whatsapp DESC, total_registrations DESC
+  `).all(minData) as any[];
+
+  const byLandingPage = db.prepare(`
+    SELECT 
+      destination_url as landing_page,
+      COUNT(*) as content_count,
+      COALESCE(SUM(sessions), 0) as total_sessions,
+      COALESCE(SUM(registrations), 0) as total_registrations,
+      COALESCE(SUM(whatsapp_clicks), 0) as total_whatsapp,
+      COALESCE(SUM(referrals), 0) as total_referrals
+    FROM content_drafts
+    WHERE status IN ('publicado', 'medindo', 'vencedor') AND destination_url IS NOT NULL
+    GROUP BY destination_url
+    HAVING content_count >= ?
+    ORDER BY total_referrals DESC, total_whatsapp DESC, total_registrations DESC
+  `).all(minData) as any[];
+
   const scored = (items: any[]) => items.map(item => {
     const members = item.total_referrals || 0;
     const whatsapp = item.total_whatsapp || 0;
@@ -1530,6 +1587,8 @@ export function calculateWeightedScore() {
     byTheme: scored(byTheme),
     byPlatform: scored(byPlatform),
     byCampaign: scored(byCampaign),
+    byCTA: scored(byCTA),
+    byLandingPage: scored(byLandingPage),
     minDataThreshold: minData,
     hasEnoughData: byTheme.length > 0 || byPlatform.length > 0,
   };
@@ -1547,9 +1606,20 @@ export function getLearningInsights() {
     insights.push({
       type: "best_theme",
       priority: "high",
-      insight: `Melhor tema: "${best.theme}" com ${best.total_referrals} membros e score ${best.score}`,
+      insight: `Melhor tema: "${best.theme}" com ${best.total_referrals} membros, ${best.total_whatsapp} cliques WhatsApp e score ${best.score}`,
       data: best,
     });
+    if (score.byTheme.length > 1) {
+      const worst = score.byTheme[score.byTheme.length - 1];
+      if (worst.score < best.score * 0.3) {
+        insights.push({
+          type: "theme_gap",
+          priority: "medium",
+          insight: `Tema "${worst.theme}" tem score ${worst.score}x menor que "${best.theme}". Considere abandonar.`,
+          data: worst,
+        });
+      }
+    }
   }
 
   if (score.byPlatform.length > 0) {
@@ -1557,9 +1627,18 @@ export function getLearningInsights() {
     insights.push({
       type: "best_platform",
       priority: "high",
-      insight: `Melhor plataforma: "${best.platform}" com ${best.total_referrals} membros e score ${best.score}`,
+      insight: `Melhor plataforma: "${best.platform}" com ${best.total_referrals} membros, ${best.total_whatsapp} cliques WhatsApp e score ${best.score}`,
       data: best,
     });
+    if (score.byPlatform.length > 1) {
+      const second = score.byPlatform[1];
+      insights.push({
+        type: "platform_comparison",
+        priority: "medium",
+        insight: `2ª melhor plataforma: "${second.platform}" com score ${second.score} vs ${best.score} (${best.platform})`,
+        data: second,
+      });
+    }
   }
 
   if (score.byCampaign.length > 0) {
@@ -1567,7 +1646,27 @@ export function getLearningInsights() {
     insights.push({
       type: "best_campaign",
       priority: "high",
-      insight: `Melhor campanha: "${best.utm_campaign}" com ${best.total_referrals} membros e score ${best.score}`,
+      insight: `Melhor campanha: "${best.utm_campaign}" com ${best.total_referrals} membros, ${best.total_whatsapp} cliques WhatsApp e score ${best.score}`,
+      data: best,
+    });
+  }
+
+  if (score.byCTA.length > 0) {
+    const best = score.byCTA[0];
+    insights.push({
+      type: "best_cta",
+      priority: "high",
+      insight: `Melhor CTA: "${best.cta}" com ${best.total_referrals} membros e score ${best.score}`,
+      data: best,
+    });
+  }
+
+  if (score.byLandingPage.length > 0) {
+    const best = score.byLandingPage[0];
+    insights.push({
+      type: "best_landing_page",
+      priority: "high",
+      insight: `Melhor landing page: "${best.landing_page}" com ${best.total_referrals} membros e score ${best.score}`,
       data: best,
     });
   }
@@ -1595,8 +1694,24 @@ export function getLearningInsights() {
     insights.push({
       type: "low_performance",
       priority: "low",
-      insight: `"${l.title}" tem ${l.session} visitantes mas apenas ${l.registrations} cadastros. Considere pausar.`,
+      insight: `"${l.title}" tem ${l.sessions} visitantes mas apenas ${l.registrations} cadastros. Considere pausar.`,
       data: l,
+    });
+  });
+
+  const winners = db.prepare(`
+    SELECT * FROM content_drafts 
+    WHERE status IN ('publicado', 'medindo') 
+    AND referrals > 0
+    ORDER BY referrals DESC LIMIT 3
+  `).all() as any[];
+  
+  winners.forEach(w => {
+    insights.push({
+      type: "winner_content",
+      priority: "high",
+      insight: `"${w.title}" gerou ${w.referrals} membros! Potencial de replicação.`,
+      data: w,
     });
   });
 
@@ -1630,6 +1745,393 @@ export function setAgentMode(mode: "test" | "autonomous" | "paused") {
 
 export function setMinDataThreshold(threshold: number) {
   setAgentConfig("min_data_threshold", threshold.toString());
+}
+
+export function createCampaignContent(data: {
+  campaign_id: string;
+  content_index: number;
+  platform: string;
+  title: string;
+  body?: string;
+  cta?: string;
+  url?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_content?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT INTO campaign_contents (campaign_id, content_index, platform, title, body, cta, url, utm_source, utm_medium, utm_campaign, utm_content)
+    VALUES (@campaign_id, @content_index, @platform, @title, @body, @cta, @url, @utm_source, @utm_medium, @utm_campaign, @utm_content)`).run({
+    ...data,
+    body: data.body || null,
+    cta: data.cta || null,
+    url: data.url || null,
+    utm_source: data.utm_source || data.platform,
+    utm_medium: data.utm_medium || "organic",
+    utm_campaign: data.utm_campaign || "primeiro-100-membros",
+    utm_content: data.utm_content || null,
+  });
+}
+
+export function getCampaignContents(campaignId: string) {
+  const db = getDb();
+  return db.prepare("SELECT * FROM campaign_contents WHERE campaign_id = ? ORDER BY content_index ASC, platform ASC").all(campaignId) as any[];
+}
+
+export function getCampaignStats(campaignId: string) {
+  const db = getDb();
+  const contents = db.prepare("SELECT * FROM campaign_contents WHERE campaign_id = ?").all(campaignId) as any[];
+
+  const totalContents = contents.length;
+  const published = contents.filter(c => c.status === "publicado").length;
+  const ready = contents.filter(c => c.status === "pronto").length;
+  const measuring = contents.filter(c => c.status === "medindo").length;
+
+  const totalSessions = contents.reduce((s, c) => s + (c.sessions || 0), 0);
+  const totalRegistrations = contents.reduce((s, c) => s + (c.registrations || 0), 0);
+  const totalWhatsapp = contents.reduce((s, c) => s + (c.whatsapp_clicks || 0), 0);
+  const totalReferrals = contents.reduce((s, c) => s + (c.referrals || 0), 0);
+
+  const byPlatform: Record<string, any> = {};
+  for (const c of contents) {
+    if (!byPlatform[c.platform]) {
+      byPlatform[c.platform] = { platform: c.platform, count: 0, sessions: 0, registrations: 0, whatsapp_clicks: 0, referrals: 0, published: 0 };
+    }
+    byPlatform[c.platform].count++;
+    byPlatform[c.platform].sessions += c.sessions || 0;
+    byPlatform[c.platform].registrations += c.registrations || 0;
+    byPlatform[c.platform].whatsapp_clicks += c.whatsapp_clicks || 0;
+    byPlatform[c.platform].referrals += c.referrals || 0;
+    if (c.status === "publicado") byPlatform[c.platform].published++;
+  }
+
+  const byContent: Record<number, any> = {};
+  for (const c of contents) {
+    if (!byContent[c.content_index]) {
+      byContent[c.content_index] = { content_index: c.content_index, title: c.title, sessions: 0, registrations: 0, whatsapp_clicks: 0, referrals: 0, platforms: 0 };
+    }
+    byContent[c.content_index].sessions += c.sessions || 0;
+    byContent[c.content_index].registrations += c.registrations || 0;
+    byContent[c.content_index].whatsapp_clicks += c.whatsapp_clicks || 0;
+    byContent[c.content_index].referrals += c.referrals || 0;
+    byContent[c.content_index].platforms++;
+  }
+
+  const bestContent = Object.values(byContent).sort((a: any, b: any) => b.referrals - a.referrals || b.whatsapp_clicks - a.whatsapp_clicks)[0] || null;
+  const bestPlatform = Object.values(byPlatform).sort((a: any, b: any) => b.referrals - a.referrals || b.whatsapp_clicks - a.whatsapp_clicks)[0] || null;
+
+  const bestCTA = db.prepare(`
+    SELECT cta, SUM(referrals) as referrals, SUM(whatsapp_clicks) as whatsapp_clicks, SUM(registrations) as registrations
+    FROM campaign_contents WHERE campaign_id = ? AND cta IS NOT NULL
+    GROUP BY cta ORDER BY referrals DESC, whatsapp_clicks DESC LIMIT 1
+  `).get(campaignId) as any || null;
+
+  const bestLandingPage = db.prepare(`
+    SELECT url as landing_page, SUM(referrals) as referrals, SUM(whatsapp_clicks) as whatsapp_clicks, SUM(registrations) as registrations
+    FROM campaign_contents WHERE campaign_id = ? AND url IS NOT NULL
+    GROUP BY url ORDER BY referrals DESC, whatsapp_clicks DESC LIMIT 1
+  `).get(campaignId) as any || null;
+
+  return {
+    campaign_id: campaignId,
+    totalContents,
+    published,
+    ready,
+    measuring,
+    totalSessions,
+    totalRegistrations,
+    totalWhatsapp,
+    totalReferrals,
+    conversionRate: totalSessions > 0 ? Math.round((totalRegistrations / totalSessions) * 100) : 0,
+    whatsappRate: totalRegistrations > 0 ? Math.round((totalWhatsapp / totalRegistrations) * 100) : 0,
+    memberRate: totalWhatsapp > 0 ? Math.round((totalReferrals / totalWhatsapp) * 100) : 0,
+    byPlatform: Object.values(byPlatform),
+    byContent: Object.values(byContent),
+    bestContent,
+    bestPlatform,
+    bestCTA,
+    bestLandingPage,
+  };
+}
+
+export function updateCampaignContent(campaignId: string, contentIndex: number, platform: string, data: Record<string, any>) {
+  const db = getDb();
+  const allowed = ["status", "sessions", "registrations", "whatsapp_clicks", "referrals", "score", "published_at"];
+  const updates: string[] = [];
+  const values: any[] = [];
+  Object.entries(data).forEach(([key, value]) => {
+    if (allowed.includes(key)) { updates.push(`${key} = ?`); values.push(value); }
+  });
+  if (updates.length === 0) return;
+  updates.push("updated_at = CURRENT_TIMESTAMP");
+  values.push(campaignId, contentIndex, platform);
+  db.prepare(`UPDATE campaign_contents SET ${updates.join(", ")} WHERE campaign_id = ? AND content_index = ? AND platform = ?`).run(...values);
+}
+
+export function seedPrimeiraCampanha() {
+  const campaignId = "primeiro-100-membros";
+  const SITE_URL = "https://equipe-ademilson.vercel.app";
+  const WA_GROUP = "https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2";
+
+  const contents = [
+    // CONTEÚDO 01 — O que são os vídeos para treinamento de IA
+    {
+      index: 1, platform: "youtube",
+      title: "O que SÃO os Vídeos para Treinamento de IA? (Explicação Completa)",
+      body: "Neste vídeo, explicamos o que são os vídeos para treinamento de inteligência artificial, por que empresas pagam por eles e como você pode participar gravando vídeos do dia a dia.",
+      cta: "Link na descrição para entrar no grupo",
+      utm_content: "video-01-youtube",
+    },
+    {
+      index: 1, platform: "tiktok",
+      title: "O que são os Vídeos para IA em 60 Segundos",
+      body: "Você sabia que a IA precisa de vídeos reais para aprender? Grave do dia adia e ganhe em dólar. Explico em 60 segundos.",
+      cta: "Link na bio",
+      utm_content: "video-01-tiktok",
+    },
+    {
+      index: 1, platform: "instagram",
+      title: "🤖 O que são Vídeos para Treinamento de IA?",
+      body: "A inteligência artificial precisa assistir vídeos reais para aprender. E você pode ganhar dinheiro gravando esses vídeos. Salve para consultar depois!",
+      cta: "Link na bio para saber mais",
+      utm_content: "video-01-instagram",
+    },
+    {
+      index: 1, platform: "facebook",
+      title: "Você Sabia que a IA Precisa de Vídeos para Aprender?",
+      body: "Empresas de tecnologia precisam de vídeos reais do dia a dia para treinar seus sistemas de IA. E pagam por isso. Saiba como funciona.",
+      cta: "Clique no link para entrar no grupo",
+      utm_content: "video-01-facebook",
+    },
+    {
+      index: 1, platform: "pinterest",
+      title: "O que são Vídeos para Treinamento de IA — Guia Completo",
+      body: "Descubra o que são os vídeos para treinamento de IA, como funcionam e por que estão se tornando uma oportunidade de renda extra.",
+      cta: "Saiba mais no site",
+      utm_content: "video-01-pinterest",
+    },
+    {
+      index: 1, platform: "reddit",
+      title: "[Discussão] Alguém pode explicar o que são vídeos para treinamento de IA?",
+      body: "Estou vendo muita gente falando sobre gravar vídeos para treinar IA. Alguém pode explicar como funciona na prática? Quero entender melhor antes de participar.",
+      cta: "Mais informações no link",
+      utm_content: "video-01-reddit",
+    },
+
+    // CONTEÚDO 02 — Como funciona a participação no projeto
+    {
+      index: 2, platform: "youtube",
+      title: "Como Funciona a PARTICIPAÇÃO no Projeto de Vídeos para IA (Passo a Passo)",
+      body: "Neste vídeo, mostramos como funciona a participação no projeto: desde o cadastro até a gravação dos primeiros vídeos. Tudo explicado passo a passo.",
+      cta: "Link na descrição para começar",
+      utm_content: "video-02-youtube",
+    },
+    {
+      index: 2, platform: "tiktok",
+      title: "Passo a Passo para Participar do Projeto de IA",
+      body: "1. Entre no grupo. 2. Faça o cadastro. 3. Grave vídeos do dia a dia. 4. Ganhe em dólar. Simples assim!",
+      cta: "Link na bio para começar",
+      utm_content: "video-02-tiktok",
+    },
+    {
+      index: 2, platform: "instagram",
+      title: "📸 Como Participar do Projeto — Passo a Passo",
+      body: "Passo 1: Entre no grupo WhatsApp.\nPasso 2: Faça seu cadastro.\nPasso 3: Grave vídeos do dia a dia.\nPasso 4: Receba em dólar.\n\nSalve esse post!",
+      cta: "Link na bio para começar",
+      utm_content: "video-02-instagram",
+    },
+    {
+      index: 2, platform: "facebook",
+      title: "Como Participar: 4 Passos Simples para Ganhar com Vídeos para IA",
+      body: "1. Entre no nosso grupo WhatsApp gratuito.\n2. Faça seu cadastro rápido.\n3. Grave vídeos do seu dia a dia.\n4. Receba seus ganhos em dólar.\n\nNão precisa de experiência prévia.",
+      cta: "Entre no grupo pelo link",
+      utm_content: "video-02-facebook",
+    },
+    {
+      index: 2, platform: "pinterest",
+      title: "Guia: Como Participar do Projeto de Gravação para IA",
+      body: "Passo a passo completo para começar a gravar vídeos para treinamento de IA. Do cadastro à primeira gravação.",
+      cta: "Saiba mais no site",
+      utm_content: "video-02-pinterest",
+    },
+    {
+      index: 2, platform: "reddit",
+      title: "Guia: Como começar a gravar vídeos para treinamento de IA",
+      body: "Fiz um resumo do processo: cadastro no grupo, gravação de vídeos do dia a dia, envio e pagamento. Alguém já participou? Como foi a experiência?",
+      cta: "Link para mais detalhes",
+      utm_content: "video-02-reddit",
+    },
+
+    // CONTEÚDO 03 — Quem pode participar
+    {
+      index: 3, platform: "youtube",
+      title: "Quem PODE Participar? (Requisitos para Gravar Vídeos para IA)",
+      body: "Neste vídeo, explicamos quem pode participar do projeto. Spoiler: se você tem um smartphone e sabe gravar um vídeo, já pode começar.",
+      cta: "Link na descrição para se inscrever",
+      utm_content: "video-03-youtube",
+    },
+    {
+      index: 3, platform: "tiktok",
+      title: "Você Pode Participar? Veja os Requisitos",
+      body: "Precisa de smartphone? Sim. Precisa de experiência? Não. Precisa de setup profissional? Também não. Veja se você se encaixa.",
+      cta: "Link na bio",
+      utm_content: "video-03-tiktok",
+    },
+    {
+      index: 3, platform: "instagram",
+      title: "👤 Quem Pode Participar do Projeto?",
+      body: "✅ Tem smartphone\n✅ Sabe gravar um vídeo\n✅ Quer ganhar dinheiro extra\n\nNão precisa de experiência. Não precisa de equipamento profissional.\n\nMarque um amigo que se encaixa!",
+      cta: "Link na bio para se inscrever",
+      utm_content: "video-03-instagram",
+    },
+    {
+      index: 3, platform: "facebook",
+      title: "Quem Pode Participar? Veja os Requisitos Simples",
+      body: "Para participar, você precisa apenas de:\n• Um smartphone\n• Vontade de aprender\n• 10-15 minutos por dia\n\nNão precisa de experiência prévia. Não precisa de equipamento profissional.",
+      cta: "Entre no grupo e descubra",
+      utm_content: "video-03-facebook",
+    },
+    {
+      index: 3, platform: "pinterest",
+      title: "Quem Pode Participar do Projeto de Vídeos para IA?",
+      body: "Requisitos simples: smartphone, vontade de aprender e disponibilidade. Não precisa de experiência. Veja os detalhes completos.",
+      cta: "Saiba mais",
+      utm_content: "video-03-pinterest",
+    },
+    {
+      index: 3, platform: "reddit",
+      title: "Requisitos para participar do projeto de gravação de vídeos para IA",
+      body: "Vi que precisa basicamente de smartphone e cadastro no grupo. Alguém sabe se aceita pessoas de qualquer estado? Como funciona a verificação dos vídeos?",
+      cta: "Link para os requisitos completos",
+      utm_content: "video-03-reddit",
+    },
+
+    // CONTEÚDO 04 — Quanto uma pessoa pode ganhar
+    {
+      index: 4, platform: "youtube",
+      title: "QUANTO GANHA quem Grava Vídeos para IA? (Valores Reais, Sem Mito)",
+      body: "Neste vídeo, falamos sobre quanto é possível ganhar gravando vídeos para treinamento de IA. Importante: valores são estimativas e NÃO são garantia de ganho.",
+      cta: "Link na descrição para começar",
+      utm_content: "video-04-youtube",
+    },
+    {
+      index: 4, platform: "tiktok",
+      title: "Quanto Ganha? (Sem Mito, Sem Garantia)",
+      body: "Valores variam muito. Não é garantia. Mas mostramos o que as pessoas estão conseguindo. Lembre: resultados não são garantidos.",
+      cta: "Link na bio para saber mais",
+      utm_content: "video-04-tiktok",
+    },
+    {
+      index: 4, platform: "instagram",
+      title: "💰 Quanto é Possível Ganhar? (Valores Estimados)",
+      body: "⚠️ ATENÇÃO: Valores são estimativas. NÃO são garantia de ganho.\n\nMostramos a faixa estimada para você ter uma ideia. Cada pessoa tem um resultado diferente.\n\nSalve para não esquecer!",
+      cta: "Link na bio para detalhes",
+      utm_content: "video-04-instagram",
+    },
+    {
+      index: 4, platform: "facebook",
+      title: "Quanto Ganha quem Grava Vídeos para IA? (Valores Estimados)",
+      body: "Importante: valores são estimativas e NÃO são garantia.\n\nMostramos a faixa estimada para você ter uma ideia do potencial. Cada pessoa tem um resultado diferente dependendo de vários fatores.",
+      cta: "Saiba mais no grupo",
+      utm_content: "video-04-facebook",
+    },
+    {
+      index: 4, platform: "pinterest",
+      title: "Quanto Ganha quem Grava Vídeos para IA? (Estimativas)",
+      body: "Valores estimados — não são garantia. Veja a faixa de ganho potencial e entenda os fatores que influenciam seus resultados.",
+      cta: "Ver detalhes no site",
+      utm_content: "video-04-pinterest",
+    },
+    {
+      index: 4, platform: "reddit",
+      title: "Quanto é possível ganhar gravando vídeos para IA? (sem hype)",
+      body: "Quero dados reais, sem exagero. Alguém que já participa pode compartilhar quanto conseguiu ganhar? Valores estimados ou reais. Sem promessas.",
+      cta: "Link para ver estimativas",
+      utm_content: "video-04-reddit",
+    },
+
+    // CONTEÚDO 05 — Como entrar e começar
+    {
+      index: 5, platform: "youtube",
+      title: "COMO ENTRAR e Começar Agora (Grupo WhatsApp + Cadastro)",
+      body: "Neste vídeo, mostramos exatamente como entrar no grupo WhatsApp, fazer seu cadastro e começar a gravar seus primeiros vídeos para IA.",
+      cta: "Link na descrição — entre agora",
+      utm_content: "video-05-youtube",
+    },
+    {
+      index: 5, platform: "tiktok",
+      title: "Como Começar AGORA (3 Passos Rápidos)",
+      body: "1. Clica no link da bio. 2. Entra no grupo WhatsApp. 3. Faz o cadastro. Pronto, já pode começar!",
+      cta: "Link na bio — comece agora",
+      utm_content: "video-05-tiktok",
+    },
+    {
+      index: 5, platform: "instagram",
+      title: "🚀 Como Começar Agora — 3 Passos",
+      body: "1️⃣ Clique no link da bio\n2️⃣ Entre no grupo WhatsApp gratuito\n3️⃣ Faça seu cadastro\n\nEm menos de 5 minutos você está dentro.\n\nMarque quem precisa de renda extra!",
+      cta: "Link na bio — comece agora",
+      utm_content: "video-05-instagram",
+    },
+    {
+      index: 5, platform: "facebook",
+      title: "Como Começar a Ganhar com Vídeos para IA (Guia Rápido)",
+      body: "Passo 1: Entre no nosso grupo WhatsApp (link nos comentários).\nPasso 2: Faça seu cadastro gratuito.\nPasso 3: Assista o tutorial e grave seu primeiro vídeo.\n\nComece hoje mesmo!",
+      cta: "Entre no grupo pelo link",
+      utm_content: "video-05-facebook",
+    },
+    {
+      index: 5, platform: "pinterest",
+      title: "Como Começar a Gravar Vídeos para IA — Guia Rápido",
+      body: "Guia passo a passo: como entrar no grupo, fazer cadastro e começar a gravar seus primeiros vídeos para treinamento de IA.",
+      cta: "Comece agora no site",
+      utm_content: "video-05-pinterest",
+    },
+    {
+      index: 5, platform: "reddit",
+      title: "Como começar: guia rápido para gravar vídeos para IA",
+      body: "Resumo rápido: entre no grupo WhatsApp (link), faça o cadastro e comece a gravar. Alguém tem dicas para iniciantes? Quero começar mas não sei por onde.",
+      cta: "Link para começar",
+      utm_content: "video-05-reddit",
+    },
+  ];
+
+  let created = 0;
+  for (const c of contents) {
+    const utmSource = c.platform;
+    const utmMedium = "organic";
+    const utmCampaign = "primeiro-100-membros";
+    const utmContent = c.utm_content;
+    const utmParams = `utm_source=${utmSource}&utm_medium=${utmMedium}&utm_campaign=${utmCampaign}&utm_content=${utmContent}`;
+    const url = `${SITE_URL}?${utmParams}`;
+    const waUrl = `${WA_GROUP}?${utmParams}`;
+
+    const finalUrl = c.platform === "facebook" ? waUrl : url;
+
+    createCampaignContent({
+      campaign_id: campaignId,
+      content_index: c.index,
+      platform: c.platform,
+      title: c.title,
+      body: c.body,
+      cta: c.cta,
+      url: finalUrl,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign,
+      utm_content: utmContent,
+    });
+    created++;
+  }
+
+  createAgentLog({
+    agent_type: "content_engine",
+    action: "seed_campaign",
+    details: `Campanha "${campaignId}" criada com ${created} conteúdos`,
+    status: "success",
+  });
+
+  return { campaign_id: campaignId, created };
 }
 
 export default getDb;

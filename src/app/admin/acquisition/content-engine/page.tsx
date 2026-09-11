@@ -143,6 +143,7 @@ export default function ContentEnginePage() {
       <header className={styles.header}>
         <h1>⚙️ CONTENT ENGINE</h1>
         <div className={styles.headerActions}>
+          <a href="/admin/acquisition/campaign" className={styles.link}>🚀 Primeira Campanha</a>
           <a href="/admin/acquisition" className={styles.link}>← Command Center</a>
         </div>
       </header>
@@ -250,6 +251,28 @@ export default function ContentEnginePage() {
                   <table className={styles.table}>
                     <thead><tr><th>Campanha</th><th>Conteúdos</th><th>Visitantes</th><th>Cadastros</th><th>WhatsApp</th><th>Membros</th><th>Score</th></tr></thead>
                     <tbody>{learning.score.byCampaign.map((c: any) => (<tr key={c.utm_campaign}><td style={{ fontWeight: 700 }}>{c.utm_campaign}</td><td>{c.content_count}</td><td>{c.total_sessions}</td><td>{c.total_registrations}</td><td>{c.total_whatsapp}</td><td style={{ color: "#4ade80", fontWeight: 700 }}>{c.total_referrals}</td><td style={{ color: "var(--gold)", fontWeight: 700 }}>{c.score}</td></tr>))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {learning.score.byCTA && learning.score.byCTA.length > 0 && (
+              <div className={styles.subsection}>
+                <h3>Por CTA</h3>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead><tr><th>CTA</th><th>Conteúdos</th><th>Visitantes</th><th>Cadastros</th><th>WhatsApp</th><th>Membros</th><th>Score</th></tr></thead>
+                    <tbody>{learning.score.byCTA.map((c: any) => (<tr key={c.cta}><td style={{ fontWeight: 700 }}>{c.cta}</td><td>{c.content_count}</td><td>{c.total_sessions}</td><td>{c.total_registrations}</td><td>{c.total_whatsapp}</td><td style={{ color: "#4ade80", fontWeight: 700 }}>{c.total_referrals}</td><td style={{ color: "var(--gold)", fontWeight: 700 }}>{c.score}</td></tr>))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {learning.score.byLandingPage && learning.score.byLandingPage.length > 0 && (
+              <div className={styles.subsection}>
+                <h3>Por Landing Page</h3>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead><tr><th>Landing Page</th><th>Conteúdos</th><th>Visitantes</th><th>Cadastros</th><th>WhatsApp</th><th>Membros</th><th>Score</th></tr></thead>
+                    <tbody>{learning.score.byLandingPage.map((l: any) => (<tr key={l.landing_page}><td style={{ fontWeight: 700 }}>{l.landing_page}</td><td>{l.content_count}</td><td>{l.total_sessions}</td><td>{l.total_registrations}</td><td>{l.total_whatsapp}</td><td style={{ color: "#4ade80", fontWeight: 700 }}>{l.total_referrals}</td><td style={{ color: "var(--gold)", fontWeight: 700 }}>{l.score}</td></tr>))}</tbody>
                   </table>
                 </div>
               </div>

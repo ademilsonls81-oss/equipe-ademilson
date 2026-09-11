@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório — Camada de Aprendizado para Aquisição</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; padding: 40px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 28px; color: #0f0f23; border-bottom: 3px solid #d4a017; padding-bottom: 12px; margin-bottom: 8px; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 32px; }
+  h2 { font-size: 20px; color: #0f0f23; margin: 32px 0 16px; border-left: 4px solid #d4a017; padding-left: 12px; }
+  h3 { font-size: 16px; color: #333; margin: 20px 0 10px; }
+  p, li { font-size: 14px; color: #333; }
+  ul { padding-left: 24px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+  th { background: #0f0f23; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) { background: #f8f8f8; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+  .badge-ok { background: #d4edda; color: #155724; }
+  .badge-warn { background: #fff3cd; color: #856404; }
+  .badge-manual { background: #e2e3e5; color: #383d41; }
+  .score-box { background: #0f0f23; color: #d4a017; padding: 20px; border-radius: 8px; text-align: center; margin: 16px 0; }
+  .score-box .big { font-size: 36px; font-weight: 900; }
+  .score-box .label { font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 2px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+  .card { background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; }
+  .card .icon { font-size: 24px; margin-bottom: 8px; }
+  .card .value { font-size: 24px; font-weight: 900; color: #0f0f23; }
+  .card .label { font-size: 12px; color: #666; }
+  .section { page-break-inside: avoid; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+
+<h1>📊 Relatório — Camada de Aprendizado para Aquisição</h1>
+<p class="subtitle">Content Engine — Transformação de "Gerador de Conteúdo" para "Máquina de Aquisição Orientada por Resultados"<br>Gerado em: 11/09/2026</p>
+
+<!-- RESUMO EXECUTIVO -->
+<div class="section">
+<h2>1. Resumo Executivo</h2>
+<p>Foi implementada uma <strong>camada de aprendizado baseada em conversões reais</strong> que permite ao Content Engine identificar automaticamente o que funciona e o que não funciona, priorizando métricas de valor real sobre visualizações.</p>
+
+<div class="score-box">
+  <div class="label">ACQUISITION SCORE — Fórmula Ponderada</div>
+  <div class="big">MEMBROS (40%) > WHATSAPP (30%) > CADASTROS (20%) > VISITANTES (10%)</div>
+</div>
+</div>
+
+<!-- MÉTRICAS RASTREADAS -->
+<div class="section">
+<h2>2. Métricas Rastreadas pelo Sistema</h2>
+<table>
+  <tr><th>#</th><th>Métrica</th><th>Fonte de Dados</th><th>Status</th></tr>
+  <tr><td>1</td><td>Quais temas geram mais <strong>visitantes</strong></td><td><code>content_drafts.sessions</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+  <tr><td>2</td><td>Quais temas geram mais <strong>cadastros</strong></td><td><code>content_drafts.registrations</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+  <tr><td>3</td><td>Quais temas geram mais <strong>cliques no WhatsApp</strong></td><td><code>content_drafts.whatsapp_clicks</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+  <tr><td>4</td><td>Quais temas geram mais <strong>membros</strong></td><td><code>content_drafts.referrals</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+  <tr><td>5</td><td>Quais <strong>plataformas</strong> geram mais membros</td><td><code>content_drafts.platform</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+  <tr><td>6</td><td>Quais <strong>campanhas</strong> geram mais membros</td><td><code>content_drafts.utm_campaign</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+  <tr><td>7</td><td>Quais <strong>CTAs</strong> convertem melhor</td><td><code>content_drafts.cta</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+  <tr><td>8</td><td>Quais <strong>landing pages</strong> convertem melhor</td><td><code>content_drafts.destination_url</code></td><td><span class="badge badge-ok">ATIVO</span></td></tr>
+</table>
+</div>
+
+<!-- MODOS -->
+<div class="section">
+<h2>3. Modos de Operação</h2>
+<div class="grid">
+  <div class="card">
+    <div class="icon">🧪</div>
+    <div class="value">MODO TESTE</div>
+    <div class="label">AGENTE GERA E RECOMENDA — NÃO PUBLICA AUTOMATICAMENTE</div>
+    <p style="margin-top:8px;font-size:13px;">O agente gera conteúdos, recomenda publicações, mas toda ação requer aprovação manual.</p>
+  </div>
+  <div class="card">
+    <div class="icon">🤖</div>
+    <div class="value">MODO AUTÔNOMO</div>
+    <div class="label">DESATIVADO — REQUER DADOS REAIS SUFICIENTES</div>
+    <p style="margin-top:8px;font-size:13px;">Disponível somente após dados reais. Pode gerar, priorizar vencedores, criar variações, agendar, pausar baixa performance, aumentar frequência.</p>
+  </div>
+</div>
+<div class="card" style="margin-top:16px;border-color:#ef4444;">
+  <div class="icon">⏸️</div>
+  <div class="value" style="color:#ef4444;">PAUSAR TUDO</div>
+  <div class="label">INTERROMPE TODAS AS OPERAÇÕES AUTOMATIZADAS</div>
+</div>
+
+<h3>Regras Éticas (NUNCA)</h3>
+<ul>
+  <li>Criar membros falsos</li>
+  <li>Criar conversões falsas</li>
+  <li>Enviar spam</li>
+  <li>Enviar mensagens privadas em massa</li>
+  <li>Adicionar pessoas a grupos sem consentimento</li>
+  <li>Burlar CAPTCHA</li>
+  <li>Burlar limites de API</li>
+  <li>Contornar regras das plataformas</li>
+</ul>
+</div>
+
+<!-- CANAIS -->
+<div class="section">
+<h2>4. Status dos Canais de Automação</h2>
+<table>
+  <tr><th>Canal</th><th>Automação Atual</th><th>Integração Necessária</th><th>Prioridade</th></tr>
+  <tr><td>🔍 Google/SEO</td><td><span class="badge badge-manual">MANUAL</span></td><td>API Google Search Console</td><td>Alta</td></tr>
+  <tr><td>📺 YouTube</td><td><span class="badge badge-manual">MANUAL</span></td><td>API YouTube Data v3</td><td>Alta</td></tr>
+  <tr><td>🎵 TikTok</td><td><span class="badge badge-manual">MANUAL</span></td><td>API TikTok Marketing</td><td>Média</td></tr>
+  <tr><td>📷 Instagram</td><td><span class="badge badge-manual">MANUAL</span></td><td>API Instagram Graph</td><td>Alta</td></tr>
+  <tr><td>📘 Facebook</td><td><span class="badge badge-manual">MANUAL</span></td><td>API Facebook Marketing</td><td>Média</td></tr>
+  <tr><td>📌 Pinterest</td><td><span class="badge badge-manual">MANUAL</span></td><td>API Pinterest</td><td>Baixa</td></tr>
+  <tr><td>🤖 Reddit</td><td><span class="badge badge-manual">MANUAL</span></td><td>API Reddit (OAuth)</td><td>Baixa</td></tr>
+  <tr><td>📱 WhatsApp</td><td><span class="badge badge-manual">MANUAL</span></td><td>WhatsApp Business API</td><td>Alta</td></tr>
+</table>
+</div>
+
+<!-- PRÓXIMO PASSO -->
+<div class="section">
+<h2>5. Próximo Passo para Ativar o MODO AUTÔNOMO</h2>
+<ol style="padding-left:24px;">
+  <li>Publicar <strong>pelo menos 5 conteúdos</strong> (ou o threshold configurado) em cada plataforma</li>
+  <li>Aguardar <strong>dados reais de conversão</strong> (cadastros, cliques WhatsApp, membros)</li>
+  <li>O sistema automaticamente identificará temas/plataformas vencedores</li>
+  <li>Ativar o modo autônomo no painel: <code>/admin/acquisition/content-engine</code></li>
+</ol>
+</div>
+
+<!-- MÉTRICAS COLETADAS -->
+<div class="section">
+<h2>6. Métricas Já Sendo Coletadas</h2>
+<div class="grid">
+  <div class="card">
+    <div class="icon">👁️</div>
+    <div class="value">Sessions</div>
+    <div class="label">TABELA: SESSIONS</div>
+  </div>
+  <div class="card">
+    <div class="icon">📋</div>
+    <div class="value">Registrations</div>
+    <div class="label">TABELA: REGISTRATIONS</div>
+  </div>
+  <div class="card">
+    <div class="icon">📱</div>
+    <div class="value">WhatsApp Clicks</div>
+    <div class="label">TABELA: SESSIONS.CLICKED_WHATSAPP</div>
+  </div>
+  <div class="card">
+    <div class="icon">👥</div>
+    <div class="value">Members (Referrals)</div>
+    <div class="label">TABELA: REGISTRATIONS.REFERRAL_CODE</div>
+  </div>
+  <div class="card">
+    <div class="icon">🎯</div>
+    <div class="value">CTA Performance</div>
+    <div class="label">TABELA: CONTENT_DRAFTS.CTA</div>
+  </div>
+  <div class="card">
+    <div class="icon">🌐</div>
+    <div class="value">Landing Page Performance</div>
+    <div class="label">TABELA: CONTENT_DRAFTS.DESTINATION_URL</div>
+  </div>
+</div>
+</div>
+
+<!-- ARQUIVOS ALTERADOS -->
+<div class="section">
+<h2>7. Arquivos Alterados</h2>
+<table>
+  <tr><th>Arquivo</th><th>Alteração</th></tr>
+  <tr><td><code>src/lib/db.ts</code></td><td><code>calculateWeightedScore()</code> — expandido com CTA e landing page<br><code>getLearningInsights()</code> — insights detalhados de vencedores e gaps</td></tr>
+  <tr><td><code>src/app/api/content-engine/route.ts</code></td><td>Novo endpoint <code>?learning_full=true</code></td></tr>
+  <tr><td><code>src/app/admin/acquisition/content-engine/page.tsx</code></td><td>Novas tabelas de CTA e Landing Page na aba Aprendizado</td></tr>
+</table>
+</div>
+
+<div class="footer">
+  Equipe Ademilson — Content Engine — Relatório de Aprendizado<br>
+  Gerado automaticamente em 11/09/2026
+</div>
+
+</body>
+</html>
