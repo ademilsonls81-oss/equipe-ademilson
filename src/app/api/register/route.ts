@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRegistration, createReferralCode, getReferralCode, linkSessionToRegistration } from "@/lib/db";
+import { createRegistration, createReferralCode, getReferralCode, linkSessionToRegistration, createSession } from "@/lib/db";
 import { generateUid, generateReferralCode } from "@/lib/utils";
 
 const STATES = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
@@ -38,6 +38,14 @@ export async function POST(req: NextRequest) {
     createReferralCode(uid, myCode);
 
     if (session_id) {
+      createSession({
+        session_id,
+        ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || null,
+        landing_page: "/cadastro",
+        utm_source: utm_source || url.searchParams.get("utm_source") || undefined,
+        utm_medium: utm_medium || url.searchParams.get("utm_medium") || undefined,
+        utm_campaign: utm_campaign || url.searchParams.get("utm_campaign") || undefined,
+      });
       linkSessionToRegistration(session_id, uid);
     }
 

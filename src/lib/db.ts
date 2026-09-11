@@ -300,7 +300,16 @@ export function createSession(data: {
 }) {
   const db = getDb();
   db.prepare(`INSERT OR IGNORE INTO sessions (session_id, ip_address, user_agent, referrer, landing_page, utm_source, utm_medium, utm_campaign)
-    VALUES (@session_id, @ip_address, @user_agent, @referrer, @landing_page, @utm_source, @utm_medium, @utm_campaign)`).run(data);
+    VALUES (@session_id, @ip_address, @user_agent, @referrer, @landing_page, @utm_source, @utm_medium, @utm_campaign)`).run({
+    ...data,
+    ip_address: data.ip_address || null,
+    user_agent: data.user_agent || null,
+    referrer: data.referrer || null,
+    landing_page: data.landing_page || null,
+    utm_source: data.utm_source || null,
+    utm_medium: data.utm_medium || null,
+    utm_campaign: data.utm_campaign || null,
+  });
 }
 
 export function linkSessionToRegistration(sessionId: string, uid: string) {
