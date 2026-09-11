@@ -63,6 +63,49 @@ function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_sess_id ON sessions(session_id);
     CREATE INDEX IF NOT EXISTS idx_sess_uid ON sessions(registered_uid);
+    CREATE TABLE IF NOT EXISTS content_performance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content_id TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      theme TEXT,
+      keywords TEXT,
+      utm_source TEXT,
+      utm_medium TEXT,
+      utm_campaign TEXT,
+      url TEXT,
+      sessions INTEGER DEFAULT 0,
+      registrations INTEGER DEFAULT 0,
+      whatsapp_clicks INTEGER DEFAULT 0,
+      whatsapp_joins INTEGER DEFAULT 0,
+      referrals INTEGER DEFAULT 0,
+      score REAL DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      published_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cp_platform ON content_performance(platform);
+    CREATE INDEX IF NOT EXISTS idx_cp_status ON content_performance(status);
+    CREATE INDEX IF NOT EXISTS idx_cp_theme ON content_performance(theme);
+    CREATE TABLE IF NOT EXISTS agent_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_type TEXT NOT NULL,
+      action TEXT NOT NULL,
+      details TEXT,
+      status TEXT DEFAULT 'success',
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_log_agent ON agent_logs(agent_type);
+    CREATE INDEX IF NOT EXISTS idx_log_created ON agent_logs(created_at);
+    CREATE TABLE IF NOT EXISTS agent_config (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      config_key TEXT UNIQUE NOT NULL,
+      config_value TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   return _db;
 }
@@ -270,6 +313,122 @@ export function getAnalytics() {
     bestCampaign: byCampaign[0] || null,
     bestSource: bySource[0] || null,
   };
+}
+
+export function createContentPerformance(data: {
+  content_id: string;
+  title: string;
+  platform: string;
+  content_type: string;
+  theme?: string;
+  keywords?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  url?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT OR IGNORE INTO content_performance (content_id, title, platform, content_type, theme, keywords, utm_source, utm_medium, utm_campaign, url)
+    VALUES (@content_id, @title, @platform, @content_type, @theme, @keywords, @utm_source, @utm_medium, @utm_campaign, @url)`).run(data);
+}
+
+export function updateContentPerformance(contentId: string, data: {
+  sessions?: number;
+  registrations?: number;
+  whatsapp_clicks?: number;
+  whatsapp_joins?: number;
+  referrals?: number;
+  score?: number;
+  status?: string;
+}) {
+  const db = getDb();
+  const sets = Object.entries(data).filter(([, v]) => v !== undefined).map(([k, v]) => `${k} = ${typeof v === "number" ? v : `'${v}'`}`).join(", ");
+  if (sets) {
+    db.prepare(`UPDATE content_performance SET ${sets}, updated_at = CURRENT_TIMESTAMP WHERE content_id = ?`).run(contentId);
+  }
+}
+
+export function getContentPerformance(filters?: { platform?: string; status?: string; limit?: number }) {
+  const db = getDb();
+  let query = "SELECT * FROM content_performance WHERE 1=1";
+  const params: any[] = [];
+  if (filters?.platform) { query += " AND platform = ?"; params.push(filters.platform); }
+  if (filters?.status) { query += " AND status = ?"; params.push(filters.status); }
+  query += " ORDER BY score DESC";
+  if (filters?.limit) { query += ` LIMIT ${filters.limit}`; }
+  return db.prepare(query).all(...params) as any[];
+}
+
+export function getContentStats() {
+  const db = getDb();
+  const total = (db.prepare("SELECT COUNT(*) as c FROM content_performance").get() as any).c;
+  const active = (db.prepare("SELECT COUNT(*) as c FROM content_performance WHERE status = 'active'").get() as any).c;
+  const totalSessions = (db.prepare("SELECT COALESCE(SUM(sessions),0) as c FROM content_performance").get() as any).c;
+  const totalRegistrations = (db.prepare("SELECT COALESCE(SUM(registrations),0) as c FROM content_performance").get() as any).c;
+  const totalWhatsappClicks = (db.prepare("SELECT COALESCE(SUM(whatsapp_clicks),0) as c FROM content_performance").get() as any).c;
+  const totalWhatsappJoins = (db.prepare("SELECT COALESCE(SUM(whatsapp_joins),0) as c FROM content_performance").get() as any).c;
+
+  const byPlatform = db.prepare(
+    "SELECT platform, COUNT(*) as count, SUM(sessions) as sessions, SUM(registrations) as registrations, SUM(whatsapp_clicks) as whatsapp_clicks, SUM(whatsapp_joins) as whatsapp_joins, AVG(score) as avg_score FROM content_performance GROUP BY platform ORDER BY avg_score DESC"
+  ).all() as any[];
+
+  const byTheme = db.prepare(
+    "SELECT theme, COUNT(*) as count, SUM(sessions) as sessions, SUM(registrations) as registrations, AVG(score) as avg_score FROM content_performance WHERE theme IS NOT NULL GROUP BY theme ORDER BY avg_score DESC"
+  ).all() as any[];
+
+  const bestContent = db.prepare(
+    "SELECT * FROM content_performance ORDER BY score DESC LIMIT 1"
+  ).get() as any;
+
+  const worstContent = db.prepare(
+    "SELECT * FROM content_performance WHERE sessions > 0 ORDER BY score ASC LIMIT 1"
+  ).get() as any;
+
+  return {
+    total,
+    active,
+    totalSessions,
+    totalRegistrations,
+    totalWhatsappClicks,
+    totalWhatsappJoins,
+    conversionRate: totalSessions > 0 ? Math.round((totalRegistrations / totalSessions) * 100) : 0,
+    whatsappRate: totalRegistrations > 0 ? Math.round((totalWhatsappClicks / totalRegistrations) * 100) : 0,
+    byPlatform,
+    byTheme,
+    bestContent,
+    worstContent,
+  };
+}
+
+export function createAgentLog(data: {
+  agent_type: string;
+  action: string;
+  details?: string;
+  status?: string;
+  error_message?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT INTO agent_logs (agent_type, action, details, status, error_message)
+    VALUES (@agent_type, @action, @details, @status, @error_message)`).run({
+    ...data,
+    status: data.status || "success",
+  });
+}
+
+export function getAgentLogs(limit = 50) {
+  const db = getDb();
+  return db.prepare("SELECT * FROM agent_logs ORDER BY created_at DESC LIMIT ?").all(limit) as any[];
+}
+
+export function getAgentConfig(key: string) {
+  const db = getDb();
+  const row = db.prepare("SELECT config_value FROM agent_config WHERE config_key = ?").get(key) as any;
+  return row?.config_value || null;
+}
+
+export function setAgentConfig(key: string, value: string) {
+  const db = getDb();
+  db.prepare("INSERT OR REPLACE INTO agent_config (config_key, config_value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)").run(key, value);
 }
 
 export default getDb;
