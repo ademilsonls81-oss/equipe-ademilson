@@ -1450,4 +1450,186 @@ export function generateContentForTopic(topicId: string, platform: string) {
   return draftId;
 }
 
+export function calculateWeightedScore() {
+  const db = getDb();
+  const minData = parseInt(getAgentConfig("min_data_threshold") || "5");
+
+  const byTheme = db.prepare(`
+    SELECT 
+      cd.topic_id,
+      ct.title as theme,
+      COUNT(*) as content_count,
+      COALESCE(SUM(cd.sessions), 0) as total_sessions,
+      COALESCE(SUM(cd.registrations), 0) as total_registrations,
+      COALESCE(SUM(cd.whatsapp_clicks), 0) as total_whatsapp,
+      COALESCE(SUM(cd.referrals), 0) as total_referrals
+    FROM content_drafts cd
+    LEFT JOIN content_topics ct ON ct.topic_id = cd.topic_id
+    WHERE cd.status IN ('publicado', 'medindo', 'vencedor')
+    GROUP BY cd.topic_id
+    HAVING content_count >= ?
+    ORDER BY total_referrals DESC, total_whatsapp DESC, total_registrations DESC
+  `).all(minData) as any[];
+
+  const byPlatform = db.prepare(`
+    SELECT 
+      platform,
+      COUNT(*) as content_count,
+      COALESCE(SUM(sessions), 0) as total_sessions,
+      COALESCE(SUM(registrations), 0) as total_registrations,
+      COALESCE(SUM(whatsapp_clicks), 0) as total_whatsapp,
+      COALESCE(SUM(referrals), 0) as total_referrals
+    FROM content_drafts
+    WHERE status IN ('publicado', 'medindo', 'vencedor')
+    GROUP BY platform
+    HAVING content_count >= ?
+    ORDER BY total_referrals DESC, total_whatsapp DESC, total_registrations DESC
+  `).all(minData) as any[];
+
+  const byCampaign = db.prepare(`
+    SELECT 
+      utm_campaign,
+      COUNT(*) as content_count,
+      COALESCE(SUM(sessions), 0) as total_sessions,
+      COALESCE(SUM(registrations), 0) as total_registrations,
+      COALESCE(SUM(whatsapp_clicks), 0) as total_whatsapp,
+      COALESCE(SUM(referrals), 0) as total_referrals
+    FROM content_drafts
+    WHERE status IN ('publicado', 'medindo', 'vencedor') AND utm_campaign IS NOT NULL
+    GROUP BY utm_campaign
+    HAVING content_count >= ?
+    ORDER BY total_referrals DESC, total_whatsapp DESC, total_registrations DESC
+  `).all(minData) as any[];
+
+  const scored = (items: any[]) => items.map(item => {
+    const members = item.total_referrals || 0;
+    const whatsapp = item.total_whatsapp || 0;
+    const registrations = item.total_registrations || 0;
+    const visitors = item.total_sessions || 0;
+    
+    const memberScore = members * 40;
+    const whatsappScore = whatsapp * 30;
+    const registrationScore = registrations * 20;
+    const visitorScore = visitors * 10;
+    const totalScore = memberScore + whatsappScore + registrationScore + visitorScore;
+    
+    const memberRate = visitors > 0 ? (members / visitors) : 0;
+    const whatsappRate = registrations > 0 ? (whatsapp / registrations) : 0;
+    const conversionRate = visitors > 0 ? (registrations / visitors) : 0;
+
+    return {
+      ...item,
+      score: Math.round(totalScore * 10) / 10,
+      member_rate: Math.round(memberRate * 100) / 100,
+      whatsapp_rate: Math.round(whatsappRate * 100) / 100,
+      conversion_rate: Math.round(conversionRate * 100) / 100,
+    };
+  });
+
+  return {
+    byTheme: scored(byTheme),
+    byPlatform: scored(byPlatform),
+    byCampaign: scored(byCampaign),
+    minDataThreshold: minData,
+    hasEnoughData: byTheme.length > 0 || byPlatform.length > 0,
+  };
+}
+
+export function getLearningInsights() {
+  const db = getDb();
+  const score = calculateWeightedScore();
+  const minData = parseInt(getAgentConfig("min_data_threshold") || "5");
+  
+  const insights: { type: string; priority: string; insight: string; data: any }[] = [];
+
+  if (score.byTheme.length > 0) {
+    const best = score.byTheme[0];
+    insights.push({
+      type: "best_theme",
+      priority: "high",
+      insight: `Melhor tema: "${best.theme}" com ${best.total_referrals} membros e score ${best.score}`,
+      data: best,
+    });
+  }
+
+  if (score.byPlatform.length > 0) {
+    const best = score.byPlatform[0];
+    insights.push({
+      type: "best_platform",
+      priority: "high",
+      insight: `Melhor plataforma: "${best.platform}" com ${best.total_referrals} membros e score ${best.score}`,
+      data: best,
+    });
+  }
+
+  if (score.byCampaign.length > 0) {
+    const best = score.byCampaign[0];
+    insights.push({
+      type: "best_campaign",
+      priority: "high",
+      insight: `Melhor campanha: "${best.utm_campaign}" com ${best.total_referrals} membros e score ${best.score}`,
+      data: best,
+    });
+  }
+
+  const totalDrafts = (db.prepare("SELECT COUNT(*) as c FROM content_drafts").get() as any).c;
+  const publishedDrafts = (db.prepare("SELECT COUNT(*) as c FROM content_drafts WHERE status IN ('publicado', 'medindo', 'vencedor')").get() as any).c;
+  
+  if (publishedDrafts < minData) {
+    insights.push({
+      type: "insufficient_data",
+      priority: "warning",
+      insight: `Dados insuficientes: ${publishedDrafts}/${minData} conteúdos publicados. Necessário mais dados para decisões automáticas.`,
+      data: { published: publishedDrafts, required: minData },
+    });
+  }
+
+  const losers = db.prepare(`
+    SELECT * FROM content_drafts 
+    WHERE status IN ('publicado', 'medindo') 
+    AND sessions > 20 AND registrations < 2
+    ORDER BY sessions DESC LIMIT 5
+  `).all() as any[];
+  
+  losers.forEach(l => {
+    insights.push({
+      type: "low_performance",
+      priority: "low",
+      insight: `"${l.title}" tem ${l.session} visitantes mas apenas ${l.registrations} cadastros. Considere pausar.`,
+      data: l,
+    });
+  });
+
+  return { insights, score, hasEnoughData: score.hasEnoughData, minDataThreshold: minData };
+}
+
+export function getAgentMode() {
+  return {
+    testMode: getAgentConfig("agent_mode") !== "autonomous",
+    autonomousMode: getAgentConfig("agent_mode") === "autonomous",
+    paused: getAgentConfig("acquisition_paused") === "true",
+    minDataThreshold: parseInt(getAgentConfig("min_data_threshold") || "5"),
+  };
+}
+
+export function setAgentMode(mode: "test" | "autonomous" | "paused") {
+  const db = getDb();
+  if (mode === "paused") {
+    setAgentConfig("acquisition_paused", "true");
+  } else {
+    setAgentConfig("acquisition_paused", "false");
+    setAgentConfig("agent_mode", mode);
+  }
+  createAgentLog({
+    agent_type: "content_engine",
+    action: "set_mode",
+    details: `Modo alterado para: ${mode}`,
+    status: "success",
+  });
+}
+
+export function setMinDataThreshold(threshold: number) {
+  setAgentConfig("min_data_threshold", threshold.toString());
+}
+
 export default getDb;

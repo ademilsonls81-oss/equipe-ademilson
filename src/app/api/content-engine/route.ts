@@ -6,6 +6,7 @@ import {
   scheduleContent, getSchedule, getContentEngineDashboard,
   generateContentForTopic, setPlatformLimit,
   createAgentLog, getAgentConfig, setAgentConfig,
+  calculateWeightedScore, getLearningInsights, getAgentMode, setAgentMode, setMinDataThreshold,
 } from "@/lib/db";
 
 export async function GET(request: Request) {
@@ -37,11 +38,20 @@ export async function GET(request: Request) {
     }
     if (url.searchParams.get("agent") === "true") {
       return NextResponse.json({
+        ...getAgentMode(),
         enabled: getAgentConfig("content_agent_enabled") !== "false",
         lastRun: getAgentConfig("content_agent_last_run"),
         nextRun: getAgentConfig("content_agent_next_run"),
-        paused: getAgentConfig("acquisition_paused") === "true",
       });
+    }
+    if (url.searchParams.get("learning") === "true") {
+      return NextResponse.json(getLearningInsights());
+    }
+    if (url.searchParams.get("score") === "true") {
+      return NextResponse.json(calculateWeightedScore());
+    }
+    if (url.searchParams.get("mode") === "true") {
+      return NextResponse.json(getAgentMode());
     }
 
     return NextResponse.json(getContentEngineDashboard());
@@ -154,6 +164,30 @@ export async function POST(request: Request) {
       });
       createAgentLog({ agent_type: "content_engine", action: "seed_topics", details: `${created} topics seeded`, status: "success" });
       return NextResponse.json({ ok: true, created });
+    }
+
+    if (action === "set_mode") {
+      const { mode } = body;
+      if (!mode || !["test", "autonomous", "paused"].includes(mode)) {
+        return NextResponse.json({ error: "mode must be 'test', 'autonomous', or 'paused'" }, { status: 400 });
+      }
+      if (mode === "autonomous") {
+        const score = calculateWeightedScore();
+        if (!score.hasEnoughData) {
+          return NextResponse.json({ error: "Dados insuficientes para modo autônomo. Continúe em modo teste.", hasEnoughData: false }, { status: 400 });
+        }
+      }
+      setAgentMode(mode);
+      return NextResponse.json({ ok: true, mode });
+    }
+
+    if (action === "set_min_data") {
+      const { threshold } = body;
+      if (!threshold || typeof threshold !== "number" || threshold < 1) {
+        return NextResponse.json({ error: "threshold must be a positive number" }, { status: 400 });
+      }
+      setMinDataThreshold(threshold);
+      return NextResponse.json({ ok: true, threshold });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
