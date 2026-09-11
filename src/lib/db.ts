@@ -67,28 +67,75 @@ function getDb(): Database.Database {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       content_id TEXT UNIQUE NOT NULL,
       title TEXT NOT NULL,
+      body TEXT,
       platform TEXT NOT NULL,
       content_type TEXT NOT NULL,
       theme TEXT,
       keywords TEXT,
       utm_source TEXT,
-      utm_medium TEXT,
+      utm_medium TEXT DEFAULT 'social',
       utm_campaign TEXT,
       url TEXT,
+      share_url TEXT,
       sessions INTEGER DEFAULT 0,
       registrations INTEGER DEFAULT 0,
       whatsapp_clicks INTEGER DEFAULT 0,
       whatsapp_joins INTEGER DEFAULT 0,
       referrals INTEGER DEFAULT 0,
+      ctr REAL DEFAULT 0,
+      conversion_rate REAL DEFAULT 0,
       score REAL DEFAULT 0,
-      status TEXT DEFAULT 'active',
+      quality_score REAL DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      scheduled_at DATETIME,
       published_at DATETIME,
+      result TEXT,
+      approved INTEGER DEFAULT 0,
+      approved_by TEXT,
+      approved_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_cp_platform ON content_performance(platform);
     CREATE INDEX IF NOT EXISTS idx_cp_status ON content_performance(status);
     CREATE INDEX IF NOT EXISTS idx_cp_theme ON content_performance(theme);
+    CREATE TABLE IF NOT EXISTS content_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content_id TEXT UNIQUE NOT NULL,
+      action TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      attempts INTEGER DEFAULT 0,
+      max_attempts INTEGER DEFAULT 3,
+      last_error TEXT,
+      next_retry DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      processed_at DATETIME
+    );
+    CREATE INDEX IF NOT EXISTS idx_cq_status ON content_queue(status);
+    CREATE INDEX IF NOT EXISTS idx_cq_action ON content_queue(action);
+    CREATE TABLE IF NOT EXISTS acquisition_score (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      platform TEXT,
+      campaign TEXT,
+      theme TEXT,
+      content_id TEXT,
+      impressions INTEGER DEFAULT 0,
+      clicks INTEGER DEFAULT 0,
+      registrations INTEGER DEFAULT 0,
+      whatsapp_clicks INTEGER DEFAULT 0,
+      referrals INTEGER DEFAULT 0,
+      ctr REAL DEFAULT 0,
+      registration_rate REAL DEFAULT 0,
+      whatsapp_rate REAL DEFAULT 0,
+      referral_rate REAL DEFAULT 0,
+      members_per_content REAL DEFAULT 0,
+      score REAL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_as_date ON acquisition_score(date);
+    CREATE INDEX IF NOT EXISTS idx_as_platform ON acquisition_score(platform);
     CREATE TABLE IF NOT EXISTS referral_tracking (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       referrer_uid TEXT NOT NULL,
@@ -906,6 +953,230 @@ export function getChannelStatus() {
 export function toggleChannel(channel: string, enabled: boolean) {
   const db = getDb();
   setAgentConfig(`channel_${channel}`, enabled ? "true" : "false");
+}
+
+export function addToContentQueue(data: {
+  content_id: string;
+  action: string;
+  payload: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT OR IGNORE INTO content_queue (content_id, action, payload) VALUES (?, ?, ?)`).run(data.content_id, data.action, data.payload);
+}
+
+export function processContentQueue(limit: number = 10) {
+  const db = getDb();
+  const items = db.prepare(`SELECT * FROM content_queue WHERE status = 'pending' AND (next_retry IS NULL OR next_retry <= datetime('now')) ORDER BY created_at ASC LIMIT ?`).all(limit) as any[];
+  return items;
+}
+
+export function markQueueItemProcessed(contentId: string, status: string, error?: string) {
+  const db = getDb();
+  if (status === "error") {
+    db.prepare(`UPDATE content_queue SET status = 'error', last_error = ?, attempts = attempts + 1, next_retry = datetime('now', '+1 hour'), processed_at = CURRENT_TIMESTAMP WHERE content_id = ?`).run(error, contentId);
+  } else {
+    db.prepare(`UPDATE content_queue SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE content_id = ?`).run(status, contentId);
+  }
+}
+
+export function getContentQueueStats() {
+  const db = getDb();
+  const pending = (db.prepare("SELECT COUNT(*) as c FROM content_queue WHERE status = 'pending'").get() as any).c;
+  const processing = (db.prepare("SELECT COUNT(*) as c FROM content_queue WHERE status = 'processing'").get() as any).c;
+  const completed = (db.prepare("SELECT COUNT(*) as c FROM content_queue WHERE status = 'completed'").get() as any).c;
+  const failed = (db.prepare("SELECT COUNT(*) as c FROM content_queue WHERE status = 'error'").get() as any).c;
+  return { pending, processing, completed, failed };
+}
+
+export function calculateAcquisitionScore() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+
+  const platforms = db.prepare(`SELECT platform, COUNT(*) as content_count, SUM(sessions) as total_sessions, SUM(registrations) as total_registrations, SUM(whatsapp_clicks) as total_whatsapp, SUM(referrals) as total_referrals FROM content_performance WHERE status = 'published' GROUP BY platform`).all() as any[];
+
+  platforms.forEach(p => {
+    const ctr = p.total_sessions > 0 ? (p.total_whatsapp / p.total_sessions) : 0;
+    const registrationRate = p.total_sessions > 0 ? (p.total_registrations / p.total_sessions) : 0;
+    const whatsappRate = p.total_registrations > 0 ? (p.total_whatsapp / p.total_registrations) : 0;
+    const referralRate = p.total_registrations > 0 ? (p.total_referrals / p.total_registrations) : 0;
+    const membersPerContent = p.content_count > 0 ? (p.total_registrations / p.content_count) : 0;
+    const score = (registrationRate * 40) + (whatsappRate * 30) + (referralRate * 20) + (membersPerContent * 10);
+
+    db.prepare(`INSERT OR REPLACE INTO acquisition_score (date, platform, impressions, clicks, registrations, whatsapp_clicks, referrals, ctr, registration_rate, whatsapp_rate, referral_rate, members_per_content, score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      today, p.platform, p.total_sessions, p.total_whatsapp, p.total_registrations, p.total_whatsapp, p.total_referrals,
+      Math.round(ctr * 100) / 100, Math.round(registrationRate * 100) / 100, Math.round(whatsappRate * 100) / 100, Math.round(referralRate * 100) / 100,
+      Math.round(membersPerContent * 10) / 10, Math.round(score * 10) / 10
+    );
+  });
+
+  const campaigns = db.prepare(`SELECT utm_campaign, COUNT(*) as content_count, SUM(sessions) as total_sessions, SUM(registrations) as total_registrations, SUM(whatsapp_clicks) as total_whatsapp, SUM(referrals) as total_referrals FROM content_performance WHERE status = 'published' AND utm_campaign IS NOT NULL GROUP BY utm_campaign`).all() as any[];
+
+  campaigns.forEach(c => {
+    const score = c.total_sessions > 0 ? ((c.total_registrations / c.total_sessions) * 100) : 0;
+    db.prepare(`INSERT OR REPLACE INTO acquisition_score (date, campaign, impressions, clicks, registrations, whatsapp_clicks, referrals, score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      today, c.utm_campaign, c.total_sessions, c.total_whatsapp, c.total_registrations, c.total_whatsapp, c.total_referrals, Math.round(score * 10) / 10
+    );
+  });
+
+  return { platforms: platforms.length, campaigns: campaigns.length };
+}
+
+export function getAcquisitionScore() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+
+  const byPlatform = db.prepare(`SELECT * FROM acquisition_score WHERE date = ? AND platform IS NOT NULL ORDER BY score DESC`).all(today) as any[];
+  const byCampaign = db.prepare(`SELECT * FROM acquisition_score WHERE date = ? AND campaign IS NOT NULL ORDER BY score DESC`).all(today) as any[];
+
+  const bestPlatform = byPlatform[0] || null;
+  const bestCampaign = byCampaign[0] || null;
+
+  return { byPlatform, byCampaign, bestPlatform, bestCampaign };
+}
+
+export function getAgentRecommendations() {
+  const db = getDb();
+  const recommendations: { type: string; priority: string; action: string; reason: string; data: any }[] = [];
+
+  const bestThemes = db.prepare(`SELECT theme, AVG(score) as avg_score, COUNT(*) as count FROM content_performance WHERE status = 'published' AND theme IS NOT NULL GROUP BY theme HAVING count >= 2 ORDER BY avg_score DESC LIMIT 3`).all() as any[];
+  bestThemes.forEach(t => {
+    recommendations.push({ type: "repeat_theme", priority: "high", action: `Repetir tema "${t.theme}"`, reason: `Score médio: ${t.avg_score.toFixed(1)} (${t.count} conteúdos)`, data: t });
+  });
+
+  const badThemes = db.prepare(`SELECT theme, AVG(score) as avg_score, COUNT(*) as count FROM content_performance WHERE status = 'published' AND theme IS NOT NULL GROUP BY theme HAVING count >= 2 AND avg_score < 20 ORDER BY avg_score ASC LIMIT 3`).all() as any[];
+  badThemes.forEach(t => {
+    recommendations.push({ type: "abandon_theme", priority: "low", action: `Abandonar tema "${t.theme}"`, reason: `Score médio baixo: ${t.avg_score.toFixed(1)}`, data: t });
+  });
+
+  const bestPlatforms = db.prepare(`SELECT platform, AVG(score) as avg_score, COUNT(*) as count FROM content_performance WHERE status = 'published' GROUP BY platform ORDER BY avg_score DESC LIMIT 3`).all() as any[];
+  bestPlatforms.forEach(p => {
+    recommendations.push({ type: "focus_platform", priority: "high", action: `Focar na plataforma "${p.platform}"`, reason: `Score médio: ${p.avg_score.toFixed(1)}`, data: p });
+  });
+
+  const bestCTAs = db.prepare(`SELECT share_text, COUNT(*) as count FROM referral_tracking WHERE share_text IS NOT NULL GROUP BY share_text ORDER BY count DESC LIMIT 3`).all() as any[];
+  bestCTAs.forEach(c => {
+    recommendations.push({ type: "use_cta", priority: "medium", action: `Usar CTA: "${c.share_text.substring(0, 50)}..."`, reason: `${c.count} usos`, data: c });
+  });
+
+  return recommendations;
+}
+
+export function getGoalForecast() {
+  const db = getDb();
+  const GOAL = 1000;
+  const totalMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations").get() as any).c;
+
+  const last30 = db.prepare(`SELECT date(created_at) as day, COUNT(*) as count FROM registrations WHERE created_at >= datetime('now','-30 days') GROUP BY date(created_at) ORDER BY day`).all() as { day: string; count: number }[];
+
+  const last7 = db.prepare(`SELECT date(created_at) as day, COUNT(*) as count FROM registrations WHERE created_at >= datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day`).all() as { day: string; count: number }[];
+
+  const avgDaily30 = last30.length > 0 ? last30.reduce((s, d) => s + d.count, 0) / last30.length : 0;
+  const avgDaily7 = last7.length > 0 ? last7.reduce((s, d) => s + d.count, 0) / last7.length : 0;
+
+  const todayMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now')").get() as any).c;
+  const yesterdayMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now','-1 day')").get() as any).c;
+  const dailyGrowth = yesterdayMembers > 0 ? ((todayMembers - yesterdayMembers) / yesterdayMembers * 100) : 0;
+
+  const remaining = Math.max(0, GOAL - totalMembers);
+  const forecastDays30 = avgDaily30 > 0 ? Math.ceil(remaining / avgDaily30) : 999;
+  const forecastDays7 = avgDaily7 > 0 ? Math.ceil(remaining / avgDaily7) : 999;
+
+  const forecastDate30 = new Date();
+  forecastDate30.setDate(forecastDate30.getDate() + forecastDays30);
+  const forecastDate7 = new Date();
+  forecastDate7.setDate(forecastDate7.getDate() + forecastDays7);
+
+  return {
+    target: GOAL,
+    current: totalMembers,
+    remaining,
+    progress: Math.round((totalMembers / GOAL) * 100),
+    avgDaily30: Math.round(avgDaily30 * 10) / 10,
+    avgDaily7: Math.round(avgDaily7 * 10) / 10,
+    dailyGrowth: Math.round(dailyGrowth * 10) / 10,
+    forecastDays30,
+    forecastDays7,
+    forecastDate30: forecastDate30.toISOString().split("T")[0],
+    forecastDate7: forecastDate7.toISOString().split("T")[0],
+    last7Days: last7,
+    last30Days: last30,
+  };
+}
+
+export function getEnhancedAlerts() {
+  const db = getDb();
+  const alerts: { type: string; severity: string; message: string; timestamp: string; data?: any }[] = [];
+
+  const today = new Date().toISOString().split("T")[0];
+  const yesterdayMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now','-1 day')").get() as any).c;
+  const todayMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now')").get() as any).c;
+  const avgDaily = (db.prepare("SELECT AVG(daily_count) as avg FROM (SELECT date(created_at) as day, COUNT(*) as daily_count FROM registrations WHERE created_at >= datetime('now','-7 days') GROUP BY date(created_at))").get() as any).avg || 0;
+
+  if (todayMembers > avgDaily * 2 && avgDaily > 0) {
+    alerts.push({ type: "accelerated_growth", severity: "success", message: `Crescimento acelerado: ${todayMembers} membros hoje (média: ${avgDaily.toFixed(1)})`, timestamp: new Date().toISOString() });
+  }
+
+  if (todayMembers < avgDaily * 0.5 && avgDaily > 0) {
+    alerts.push({ type: "below_average", severity: "warning", message: `Crescimento abaixo da média: ${todayMembers} membros hoje (média: ${avgDaily.toFixed(1)})`, timestamp: new Date().toISOString() });
+  }
+
+  const highConversionCampaigns = db.prepare(`SELECT utm_campaign, COUNT(*) as count FROM registrations WHERE date(created_at) = date('now') AND utm_campaign IS NOT NULL GROUP BY utm_campaign HAVING count > 5`).all() as any[];
+  highConversionCampaigns.forEach(c => {
+    alerts.push({ type: "winning_campaign", severity: "success", message: `Campanha vencedora: "${c.utm_campaign}" com ${c.count} membros!`, timestamp: new Date().toISOString(), data: c });
+  });
+
+  const winningContent = db.prepare(`SELECT title, whatsapp_clicks, registrations FROM content_performance WHERE date(created_at) = date('now') AND whatsapp_clicks > 10`).all() as any[];
+  winningContent.forEach(c => {
+    alerts.push({ type: "winning_content", severity: "success", message: `Conteúdo vencedor: "${c.title}" com ${c.whatsapp_clicks} cliques!`, timestamp: new Date().toISOString(), data: c });
+  });
+
+  const publishErrors = db.prepare(`SELECT content_id, title, result FROM content_performance WHERE status = 'error' AND date(created_at) = date('now') LIMIT 5`).all() as any[];
+  publishErrors.forEach(e => {
+    alerts.push({ type: "publish_error", severity: "error", message: `Falha ao publicar: "${e.title}" - ${e.result}`, timestamp: new Date().toISOString(), data: e });
+  });
+
+  const integrationErrors = db.prepare(`SELECT action, error_message FROM agent_logs WHERE status = 'error' AND date(created_at) = date('now') LIMIT 5`).all() as any[];
+  integrationErrors.forEach(e => {
+    alerts.push({ type: "integration_error", severity: "error", message: `Falha de integração: ${e.action} - ${e.error_message}`, timestamp: new Date().toISOString(), data: e });
+  });
+
+  const totalMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations").get() as any).c;
+  const GOAL = 1000;
+  const progress = Math.round((totalMembers / GOAL) * 100);
+  const forecastDays = avgDaily > 0 ? Math.ceil((GOAL - totalMembers) / avgDaily) : 999;
+  if (forecastDays > 90 && totalMembers < GOAL) {
+    alerts.push({ type: "goal_at_risk", severity: "warning", message: `Meta em risco: previsão de ${forecastDays} dias para atingir ${GOAL} membros`, timestamp: new Date().toISOString() });
+  }
+
+  return alerts.sort((a, b) => {
+    const severityOrder: Record<string, number> = { error: 0, warning: 1, success: 2, info: 3 };
+    return (severityOrder[a.severity] || 4) - (severityOrder[b.severity] || 4);
+  });
+}
+
+export function getAutonomousStatus() {
+  const db = getDb();
+  return {
+    enabled: getAgentConfig("autonomous_mode") === "true",
+    lastAnalysis: getAgentConfig("last_analysis"),
+    nextAnalysis: getAgentConfig("next_analysis"),
+    actionsExecuted: parseInt(getAgentConfig("actions_executed") || "0"),
+    actionsPending: (db.prepare("SELECT COUNT(*) as c FROM content_queue WHERE status = 'pending'").get() as any).c,
+    errors: (db.prepare("SELECT COUNT(*) as c FROM agent_logs WHERE status = 'error' AND date(created_at) = date('now')").get() as any).c,
+    lastExecution: getAgentConfig("last_execution"),
+    executionCount: parseInt(getAgentConfig("execution_count") || "0"),
+  };
+}
+
+export function toggleAutonomousMode(enabled: boolean) {
+  const db = getDb();
+  setAgentConfig("autonomous_mode", enabled ? "true" : "false");
+  createAgentLog({
+    agent_type: "system",
+    action: "toggle_autonomous",
+    details: `Modo autônomo ${enabled ? "ativado" : "desativado"}`,
+    status: "success",
+  });
 }
 
 export default getDb;

@@ -288,15 +288,113 @@
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
+/* Section Header */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.agentControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btnSmall {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btnSmall:hover { border-color: var(--gold); background: rgba(212,160,23,0.1); }
+
+.autonomousBadge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.autonomousOn { background: rgba(74,222,128,0.2); color: #4ade80; }
+.autonomousOff { background: rgba(239,68,68,0.2); color: #ef4444; }
+
+/* Forecast */
+.forecastGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+.forecastCard {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+.forecastLabel { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.forecastValue { font-size: 20px; font-weight: 900; color: var(--gold); font-family: "Outfit", sans-serif; }
+.forecastDate { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+/* Recommendations */
+.recsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.recCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  background: var(--bg);
+}
+.rechigh { border-left: 3px solid #4ade80; }
+.recmedium { border-left: 3px solid #facc15; }
+.reclow { border-left: 3px solid #60a5fa; }
+.recPriority {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 14px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.1);
+}
+.rechigh .recPriority { background: rgba(74,222,128,0.2); color: #4ade80; }
+.recmedium .recPriority { background: rgba(250,204,21,0.2); color: #facc15; }
+.reclow .recPriority { background: rgba(96,165,250,0.2); color: #60a5fa; }
+.recContent { flex: 1; }
+.recAction { font-weight: 700; font-size: 14px; }
+.recReason { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.recType { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
 @media (max-width: 1024px) {
   .grid5 { grid-template-columns: repeat(3, 1fr); }
   .championsGrid { grid-template-columns: repeat(2, 1fr); }
+  .forecastGrid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
   .grid5 { grid-template-columns: repeat(2, 1fr); }
   .championsGrid { grid-template-columns: 1fr; }
   .funnelGrid { flex-direction: column; }
   .funnelArrow { transform: rotate(90deg); }
+  .forecastGrid { grid-template-columns: 1fr; }
+  .sectionHeader { flex-direction: column; align-items: flex-start; }
 }
 @media (max-width: 480px) {
   .grid5 { grid-template-columns: 1fr; }

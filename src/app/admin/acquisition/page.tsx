@@ -13,9 +13,25 @@ type CommandCenterData = {
   goal: { target: number; current: number; remaining: number; progress: number };
 };
 
-type Alert = { type: string; severity: string; message: string; timestamp: string };
-
+type Alert = { type: string; severity: string; message: string; timestamp: string; data?: any };
 type Channels = Record<string, boolean>;
+
+type Forecast = {
+  target: number; current: number; remaining: number; progress: number;
+  avgDaily30: number; avgDaily7: number; dailyGrowth: number;
+  forecastDays30: number; forecastDays7: number;
+  forecastDate30: string; forecastDate7: string;
+  last7Days: { day: string; count: number }[];
+  last30Days: { day: string; count: number }[];
+};
+
+type AutonomousStatus = {
+  enabled: boolean; lastAnalysis: string; nextAnalysis: string;
+  actionsExecuted: number; actionsPending: number; errors: number;
+  lastExecution: string; executionCount: number;
+};
+
+type Recommendation = { type: string; priority: string; action: string; reason: string; data: any };
 
 export default function AcquisitionPage() {
   const [auth, setAuth] = useState("");
@@ -23,6 +39,9 @@ export default function AcquisitionPage() {
   const [data, setData] = useState<CommandCenterData | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [channels, setChannels] = useState<Channels>({});
+  const [forecast, setForecast] = useState<Forecast | null>(null);
+  const [autonomous, setAutonomous] = useState<AutonomousStatus | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -32,15 +51,21 @@ export default function AcquisitionPage() {
     setError(false);
     const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
     try {
-      const [dataRes, alertsRes, channelsRes] = await Promise.all([
+      const [dataRes, alertsRes, channelsRes, forecastRes, autonomousRes, recsRes] = await Promise.all([
         fetch("/api/command-center", { headers }),
         fetch("/api/command-center?alerts=true", { headers }),
         fetch("/api/command-center?channels=true", { headers }),
+        fetch("/api/command-center?forecast=true", { headers }),
+        fetch("/api/command-center?autonomous=true", { headers }),
+        fetch("/api/command-center?recommendations=true", { headers }),
       ]);
       if (dataRes.ok && alertsRes.ok && channelsRes.ok) {
         setData(await dataRes.json());
         setAlerts(await alertsRes.json());
         setChannels(await channelsRes.json());
+        if (forecastRes.ok) setForecast(await forecastRes.json());
+        if (autonomousRes.ok) setAutonomous(await autonomousRes.json());
+        if (recsRes.ok) setRecommendations(await recsRes.json());
         setAuthed(true);
       } else {
         setError(true);
@@ -56,12 +81,14 @@ export default function AcquisitionPage() {
     const interval = setInterval(async () => {
       const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
       try {
-        const [dataRes, alertsRes] = await Promise.all([
+        const [dataRes, alertsRes, forecastRes] = await Promise.all([
           fetch("/api/command-center", { headers }),
           fetch("/api/command-center?alerts=true", { headers }),
+          fetch("/api/command-center?forecast=true", { headers }),
         ]);
         if (dataRes.ok) setData(await dataRes.json());
         if (alertsRes.ok) setAlerts(await alertsRes.json());
+        if (forecastRes.ok) setForecast(await forecastRes.json());
       } catch {}
     }, 10000);
     return () => clearInterval(interval);
@@ -71,7 +98,27 @@ export default function AcquisitionPage() {
     const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
     const newEnabled = !channels[channel];
     setChannels({ ...channels, [channel]: newEnabled });
-    await fetch("/api/command-center", { method: "POST", headers, body: JSON.stringify({ channel, enabled: newEnabled }) });
+    await fetch("/api/command-center", { method: "POST", headers, body: JSON.stringify({ action: "toggle_channel", channel, enabled: newEnabled }) });
+  }
+
+  async function toggleAutonomousHandler() {
+    if (!autonomous) return;
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
+    const newEnabled = !autonomous.enabled;
+    setAutonomous({ ...autonomous, enabled: newEnabled });
+    await fetch("/api/command-center", { method: "POST", headers, body: JSON.stringify({ action: "toggle_autonomous", enabled: newEnabled }) });
+  }
+
+  async function runAnalysis() {
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
+    await fetch("/api/command-center", { method: "POST", headers, body: JSON.stringify({ action: "run_analysis" }) });
+    alert("Análise executada!");
+  }
+
+  async function calculateScore() {
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
+    await fetch("/api/command-center", { method: "POST", headers, body: JSON.stringify({ action: "calculate_score" }) });
+    alert("Score calculado!");
   }
 
   if (!authed) {
@@ -98,7 +145,6 @@ export default function AcquisitionPage() {
         <div className={styles.headerActions}>
           <span className={styles.live}>🔴 AO VIVO</span>
           <a href="/admin" className={styles.link}>← Admin</a>
-          <a href="/admin/acquisition" className={styles.link}>Agente →</a>
         </div>
       </header>
 
@@ -231,9 +277,21 @@ export default function AcquisitionPage() {
         </div>
       </div>
 
-      {/* AGENTE */}
+      {/* 🤖 AGENTE */}
       <div className={styles.section}>
-        <h2>🤖 AGENTE</h2>
+        <div className={styles.sectionHeader}>
+          <h2>🤖 AGENTE</h2>
+          <div className={styles.agentControls}>
+            <span className={`${styles.autonomousBadge} ${autonomous?.enabled ? styles.autonomousOn : styles.autonomousOff}`}>
+              {autonomous?.enabled ? "AUTÔNOMO: ON" : "AUTÔNOMO: OFF"}
+            </span>
+            <button className={styles.btnSmall} onClick={toggleAutonomousHandler}>
+              {autonomous?.enabled ? "Desativar" : "Ativar"}
+            </button>
+            <button className={styles.btnSmall} onClick={runAnalysis}>Analisar</button>
+            <button className={styles.btnSmall} onClick={calculateScore}>Calcular Score</button>
+          </div>
+        </div>
         <div className={styles.grid5}>
           <div className={styles.cardBig}>
             <div className={styles.cardIcon}>📄</div>
@@ -247,41 +305,64 @@ export default function AcquisitionPage() {
           </div>
           <div className={`${styles.cardBig} ${styles.cardYellow}`}>
             <div className={styles.cardIcon}>⏳</div>
-            <div className={styles.cardValue}>{data?.agent.pending ?? 0}</div>
+            <div className={styles.cardValue}>{autonomous?.actionsPending ?? data?.agent.pending ?? 0}</div>
             <div className={styles.cardLabel}>Pendentes</div>
           </div>
           <div className={`${styles.cardBig} ${styles.cardRed}`}>
             <div className={styles.cardIcon}>❌</div>
-            <div className={styles.cardValue}>{data?.agent.errors ?? 0}</div>
+            <div className={styles.cardValue}>{autonomous?.errors ?? data?.agent.errors ?? 0}</div>
             <div className={styles.cardLabel}>Erros</div>
           </div>
           <div className={`${styles.cardBig} ${styles.cardPurple}`}>
-            <div className={styles.cardIcon}>⏰</div>
-            <div className={styles.cardValue} style={{ fontSize: "14px" }}>{data?.agent.nextExecution || "N/A"}</div>
-            <div className={styles.cardLabel}>Próxima Execução</div>
+            <div className={styles.cardIcon}>⚡</div>
+            <div className={styles.cardValue}>{autonomous?.actionsExecuted ?? 0}</div>
+            <div className={styles.cardLabel}>Executadas</div>
           </div>
         </div>
       </div>
 
-      {/* META */}
+      {/* 🎯 META 1.000 */}
       <div className={styles.section}>
-        <h2>🎯 META</h2>
+        <h2>🎯 META 1.000</h2>
         <div className={styles.goalSection}>
           <div className={styles.goalInfo}>
             <div className={styles.goalText}>
-              <span>Meta: <strong>{data?.goal.target?.toLocaleString() || "1.000"}</strong> membros</span>
-              <span>Atuais: <strong>{data?.goal.current || 0}</strong></span>
-              <span>Faltam: <strong>{data?.goal.remaining || 0}</strong></span>
+              <span>Membros atuais: <strong>{forecast?.current ?? data?.goal.current ?? 0}</strong></span>
+              <span>Membros hoje: <strong>{data?.today.newMembers ?? 0}</strong></span>
+              <span>Média diária (7d): <strong>{forecast?.avgDaily7 ?? 0}</strong></span>
+              <span>Faltam: <strong>{forecast?.remaining ?? data?.goal.remaining ?? 0}</strong></span>
             </div>
-            <div className={styles.goalPct}>{data?.goal.progress ?? 0}%</div>
+            <div className={styles.goalPct}>{forecast?.progress ?? data?.goal.progress ?? 0}%</div>
           </div>
           <div className={styles.goalBar}>
-            <div className={styles.goalBarFill} style={{ width: `${Math.min(data?.goal.progress ?? 0, 100)}%` }}></div>
+            <div className={styles.goalBarFill} style={{ width: `${Math.min(forecast?.progress ?? data?.goal.progress ?? 0, 100)}%` }}></div>
+          </div>
+          <div className={styles.forecastGrid}>
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>Previsão (média 7d)</div>
+              <div className={styles.forecastValue}>{forecast?.forecastDays7 ?? "N/A"} dias</div>
+              <div className={styles.forecastDate}>{forecast?.forecastDate7 ?? "N/A"}</div>
+            </div>
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>Previsão (média 30d)</div>
+              <div className={styles.forecastValue}>{forecast?.forecastDays30 ?? "N/A"} dias</div>
+              <div className={styles.forecastDate}>{forecast?.forecastDate30 ?? "N/A"}</div>
+            </div>
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>Crescimento diário</div>
+              <div className={styles.forecastValue}>{forecast?.dailyGrowth ?? 0}%</div>
+              <div className={styles.forecastDate}>vs ontem</div>
+            </div>
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>Média 30 dias</div>
+              <div className={styles.forecastValue}>{forecast?.avgDaily30 ?? 0}/dia</div>
+              <div className={styles.forecastDate}>membros</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* CANAIS */}
+      {/* 📡 CANAIS */}
       <div className={styles.section}>
         <h2>📡 CANAIS</h2>
         <p className={styles.sectionDesc}>Ative/desative canais de aquisição individualmente</p>
@@ -300,7 +381,26 @@ export default function AcquisitionPage() {
         </div>
       </div>
 
-      {/* ALERTAS */}
+      {/* 🧠 RECOMENDAÇÕES */}
+      {recommendations.length > 0 && (
+        <div className={styles.section}>
+          <h2>🧠 RECOMENDAÇÕES DO AGENTE</h2>
+          <div className={styles.recsList}>
+            {recommendations.map((r, i) => (
+              <div key={i} className={`${styles.recCard} ${styles[`rec${r.priority}`]}`}>
+                <div className={styles.recPriority}>{r.priority === "high" ? "!" : r.priority === "medium" ? "•" : "~"}</div>
+                <div className={styles.recContent}>
+                  <div className={styles.recAction}>{r.action}</div>
+                  <div className={styles.recReason}>{r.reason}</div>
+                </div>
+                <div className={styles.recType}>{r.type}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 🔔 ALERTAS */}
       <div className={styles.section}>
         <h2>🔔 ALERTAS</h2>
         {alerts.length === 0 ? (
@@ -322,18 +422,13 @@ export default function AcquisitionPage() {
         )}
       </div>
 
-      {/* TOP CIDADES */}
+      {/* 📍 TOP CIDADES */}
       <div className={styles.section}>
         <h2>📍 TOP CIDADES</h2>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
-              <tr>
-                <th>#</th>
-                <th>Cidade</th>
-                <th>Estado</th>
-                <th>Membros</th>
-              </tr>
+              <tr><th>#</th><th>Cidade</th><th>Estado</th><th>Membros</th></tr>
             </thead>
             <tbody>
               {(data?.byCity || []).map((c, i) => (
