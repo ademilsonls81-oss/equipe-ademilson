@@ -45,6 +45,8 @@
   min-height: 100vh;
   background: var(--bg);
   padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 .header {
   display: flex;
@@ -68,32 +70,6 @@
 }
 .link { color: var(--gold); text-decoration: none; font-weight: 600; }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-  margin-bottom: 32px;
-}
-.cardBig {
-  background: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  text-align: center;
-}
-.cardIcon { font-size: 32px; margin-bottom: 8px; }
-.cardValue {
-  font-size: 32px;
-  font-weight: 900;
-  color: var(--text);
-  font-family: "Outfit", sans-serif;
-}
-.cardLabel { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-.cardGreen .cardValue { color: #4ade80; }
-.cardYellow .cardValue { color: #facc15; }
-.cardPurple .cardValue { color: #a78bfa; }
-.cardGold .cardValue { color: var(--gold); }
-
 .section {
   background: var(--card);
   border: 1px solid var(--card-border);
@@ -101,56 +77,199 @@
   padding: 24px;
   margin-bottom: 24px;
 }
-.section h2 { font-size: 18px; margin-bottom: 20px; }
+.section h2 { font-size: 18px; margin-bottom: 8px; }
+.sectionDesc { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
 
-.winnersGrid {
+.grid5 {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
 }
-.winnerCard {
+.cardBig {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  text-align: center;
+}
+.cardIcon { font-size: 28px; margin-bottom: 8px; }
+.cardValue {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--text);
+  font-family: "Outfit", sans-serif;
+}
+.cardLabel { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.cardGreen .cardValue { color: #4ade80; }
+.cardYellow .cardValue { color: #facc15; }
+.cardPurple .cardValue { color: #a78bfa; }
+.cardGold .cardValue { color: var(--gold); }
+.cardRed .cardValue { color: #ef4444; }
+
+/* Funil */
+.funnelGrid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 20px 0;
+}
+.funnelItem {
+  flex: 1;
+  min-width: 120px;
+  max-width: 180px;
+  text-align: center;
+}
+.funnelBar {
+  height: 40px;
+  background: linear-gradient(135deg, var(--gold), #e6b800);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  transition: width 0.5s;
+  opacity: 0.8;
+}
+.funnelLabel { font-size: 12px; color: var(--text-muted); }
+.funnelValue { font-size: 16px; font-weight: 700; color: var(--text); }
+.funnelArrow {
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Origem */
+.originGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+.originCard {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+.originIcon { font-size: 24px; margin-bottom: 4px; }
+.originName { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.originCount { font-size: 20px; font-weight: 900; color: var(--text); font-family: "Outfit", sans-serif; }
+.originBar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.originBarFill { height: 100%; background: var(--gold); border-radius: 2px; transition: width 0.5s; }
+.originPct { font-size: 11px; color: var(--gold); margin-top: 4px; }
+
+/* Champions */
+.championsGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+.championCard {
   background: var(--bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   padding: 20px;
   text-align: center;
 }
-.winnerIcon { font-size: 32px; margin-bottom: 8px; }
-.winnerLabel { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-.winnerValue { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-.winnerScore { font-size: 13px; color: var(--gold); }
+.championIcon { font-size: 32px; margin-bottom: 8px; }
+.championLabel { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.championValue { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; min-height: 40px; display: flex; align-items: center; justify-content: center; }
+.championScore { font-size: 12px; color: var(--gold); }
 
-.recommendationsGrid {
+/* Goal */
+.goalSection { padding: 20px 0; }
+.goalInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.goalText {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.goalText strong { color: var(--text); }
+.goalPct {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--gold);
+  font-family: "Outfit", sans-serif;
+}
+.goalBar {
+  height: 16px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.goalBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), #4ade80);
+  border-radius: 8px;
+  transition: width 0.5s;
+}
+
+/* Channels */
+.channelsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.channelBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 2px solid var(--card-border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+}
+.channelBtn:hover { border-color: var(--gold); }
+.channelEnabled { border-color: #4ade80; background: rgba(74,222,128,0.05); }
+.channelDisabled { border-color: #ef4444; background: rgba(239,68,68,0.05); opacity: 0.7; }
+.channelStatus {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+.channelEnabled .channelStatus { background: rgba(74,222,128,0.2); color: #4ade80; }
+.channelDisabled .channelStatus { background: rgba(239,68,68,0.2); color: #ef4444; }
+
+/* Alerts */
+.alertsList {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
 }
-.recCard {
+.alertCard {
   display: flex;
   align-items: center;
-  gap: 16px;
-  background: var(--bg);
-  border: 1px solid var(--card-border);
+  gap: 12px;
+  padding: 12px 16px;
   border-radius: var(--radius);
-  padding: 16px;
+  border: 1px solid var(--card-border);
+  background: var(--bg);
 }
-.recPriority {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--gold);
-  color: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-.recContent { flex: 1; }
-.recAction { font-weight: 700; margin-bottom: 4px; }
-.recReason { font-size: 13px; color: var(--text-muted); }
+.alertsuccess { border-color: #4ade80; background: rgba(74,222,128,0.05); }
+.alertwarning { border-color: #facc15; background: rgba(250,204,21,0.05); }
+.alerterror { border-color: #ef4444; background: rgba(239,68,68,0.05); }
+.alertinfo { border-color: #60a5fa; background: rgba(96,165,250,0.05); }
+.alertIcon { font-size: 20px; flex-shrink: 0; }
+.alertContent { flex: 1; }
+.alertMessage { font-size: 14px; color: var(--text); }
+.alertTime { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
+/* Table */
 .tableWrap { overflow-x: auto; }
 .table {
   width: 100%;
@@ -169,56 +288,18 @@
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-.scoreBadge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-.scoreGood { background: rgba(74,222,128,0.15); color: #4ade80; }
-.scoreMedium { background: rgba(250,204,21,0.15); color: #facc15; }
-.scoreBad { background: rgba(239,68,68,0.15); color: #ef4444; }
-
-.statusBadge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-.statusSuccess { background: rgba(74,222,128,0.15); color: #4ade80; }
-.statusError { background: rgba(239,68,68,0.15); color: #ef4444; }
-
-.sourceGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-}
-.sourceCard {
-  background: var(--bg);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius);
-  padding: 16px;
-  text-align: center;
-}
-.sourceValue {
-  font-size: 24px;
-  font-weight: 900;
-  color: var(--gold);
-  font-family: "Outfit", sans-serif;
-}
-.sourceLabel { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-.sourceConversions { font-size: 11px; color: #4ade80; margin-top: 4px; }
-
 @media (max-width: 1024px) {
-  .grid { grid-template-columns: repeat(3, 1fr); }
-  .winnersGrid { grid-template-columns: repeat(2, 1fr); }
+  .grid5 { grid-template-columns: repeat(3, 1fr); }
+  .championsGrid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-  .grid { grid-template-columns: repeat(2, 1fr); }
-  .winnersGrid { grid-template-columns: 1fr; }
+  .grid5 { grid-template-columns: repeat(2, 1fr); }
+  .championsGrid { grid-template-columns: 1fr; }
+  .funnelGrid { flex-direction: column; }
+  .funnelArrow { transform: rotate(90deg); }
 }
 @media (max-width: 480px) {
-  .grid { grid-template-columns: 1fr; }
+  .grid5 { grid-template-columns: 1fr; }
+  .goalInfo { flex-direction: column; gap: 12px; }
+  .goalText { flex-direction: column; gap: 8px; }
 }

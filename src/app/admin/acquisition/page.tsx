@@ -2,111 +2,45 @@
 import { useState, useEffect } from "react";
 import styles from "./acquisition.module.css";
 
-type ContentStats = {
-  total: number;
-  active: number;
-  totalSessions: number;
-  totalRegistrations: number;
-  totalWhatsappClicks: number;
-  totalWhatsappJoins: number;
-  conversionRate: number;
-  whatsappRate: number;
-  byPlatform: { platform: string; count: number; sessions: number; registrations: number; whatsapp_clicks: number; whatsapp_joins: number; avg_score: number }[];
-  byTheme: { theme: string; count: number; sessions: number; registrations: number; avg_score: number }[];
-  bestContent: any;
-  worstContent: any;
+type CommandCenterData = {
+  today: { visitors: number; registrations: number; whatsappClicks: number; newMembers: number; newReferrals: number };
+  total: { visitors: number; registrations: number; whatsappClicks: number; members: number; referrals: number };
+  funnel: { visitors: number; registrations: number; whatsappClicks: number; members: number; referrals: number; registrationRate: number; whatsappRate: number; memberRate: number; referralRate: number };
+  byOrigin: { origin: string; count: number; whatsapp_clicks: number }[];
+  byCity: { city: string; state: string; count: number }[];
+  champions: { bestContent: any; bestCampaign: any; bestPlatform: any; bestCity: any; bestCTA: any };
+  agent: { generated: number; published: number; pending: number; errors: number; nextExecution: string };
+  goal: { target: number; current: number; remaining: number; progress: number };
 };
 
-type FunnelStats = {
-  totalSessions: number;
-  sessionsToday: number;
-  registered: number;
-  registeredToday: number;
-  clickedWhatsApp: number;
-  joinedWhatsApp: number;
-  conversionRate: number;
-  whatsappRate: number;
-  bySource: { source: string; sessions: number; registrations: number }[];
-  byLandingPage: { landing_page: string; sessions: number; registrations: number }[];
-};
+type Alert = { type: string; severity: string; message: string; timestamp: string };
 
-type GrowthMetrics = {
-  totalMembers: number;
-  membersToday: number;
-  membersYesterday: number;
-  referralMembers: number;
-  directMembers: number;
-  growthRate: number;
-  viralCoefficient: number;
-  last7Days: { day: string; count: number }[];
-  last30Days: { day: string; count: number }[];
-};
-
-type ReferralStats = {
-  totalReferrals: number;
-  convertedReferrals: number;
-  referralsToday: number;
-  convertedToday: number;
-  conversionRate: number;
-  growthCoefficient: number;
-  byPlatform: { platform: string; total: number; converted: number }[];
-  bySource: { source: string; total: number; converted: number }[];
-  topReferrers: { referrer_uid: string; name: string; city: string; state: string; total_referrals: number; conversions: number }[];
-  byDay: { day: string; total: number; converted: number }[];
-};
-
-type AgentLog = {
-  id: number;
-  agent_type: string;
-  action: string;
-  details: string;
-  status: string;
-  created_at: string;
-};
-
-type Recommendation = {
-  type: string;
-  priority: string;
-  action: string;
-  reason: string;
-  platform?: string;
-  theme?: string;
-};
+type Channels = Record<string, boolean>;
 
 export default function AcquisitionPage() {
   const [auth, setAuth] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [contentStats, setContentStats] = useState<ContentStats | null>(null);
-  const [funnelStats, setFunnelStats] = useState<FunnelStats | null>(null);
-  const [growthMetrics, setGrowthMetrics] = useState<GrowthMetrics | null>(null);
-  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
-  const [logs, setLogs] = useState<AgentLog[]>([]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [data, setData] = useState<CommandCenterData | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [channels, setChannels] = useState<Channels>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [agentEnabled, setAgentEnabled] = useState(true);
 
   async function login(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(false);
     const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
-    
     try {
-      const [contentRes, funnelRes, growthRes, referralRes, logsRes] = await Promise.all([
-        fetch("/api/content?stats=true", { headers }),
-        fetch("/api/funnel", { headers }),
-        fetch("/api/growth", { headers }),
-        fetch("/api/referral-tracking", { headers }),
-        fetch("/api/agent/logs", { headers }),
+      const [dataRes, alertsRes, channelsRes] = await Promise.all([
+        fetch("/api/command-center", { headers }),
+        fetch("/api/command-center?alerts=true", { headers }),
+        fetch("/api/command-center?channels=true", { headers }),
       ]);
-      
-      if (contentRes.ok && funnelRes.ok) {
-        setContentStats(await contentRes.json());
-        setFunnelStats(await funnelRes.json());
-        if (growthRes.ok) setGrowthMetrics(await growthRes.json());
-        if (referralRes.ok) setReferralStats(await referralRes.json());
-        if (logsRes.ok) setLogs(await logsRes.json());
+      if (dataRes.ok && alertsRes.ok && channelsRes.ok) {
+        setData(await dataRes.json());
+        setAlerts(await alertsRes.json());
+        setChannels(await channelsRes.json());
         setAuthed(true);
       } else {
         setError(true);
@@ -122,41 +56,35 @@ export default function AcquisitionPage() {
     const interval = setInterval(async () => {
       const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
       try {
-        const [contentRes, funnelRes, growthRes, referralRes] = await Promise.all([
-          fetch("/api/content?stats=true", { headers }),
-          fetch("/api/funnel", { headers }),
-          fetch("/api/growth", { headers }),
-          fetch("/api/referral-tracking", { headers }),
+        const [dataRes, alertsRes] = await Promise.all([
+          fetch("/api/command-center", { headers }),
+          fetch("/api/command-center?alerts=true", { headers }),
         ]);
-        if (contentRes.ok) setContentStats(await contentRes.json());
-        if (funnelRes.ok) setFunnelStats(await funnelRes.json());
-        if (growthRes.ok) setGrowthMetrics(await growthRes.json());
-        if (referralRes.ok) setReferralStats(await referralRes.json());
+        if (dataRes.ok) setData(await dataRes.json());
+        if (alertsRes.ok) setAlerts(await alertsRes.json());
       } catch {}
-    }, 30000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [authed, auth]);
+
+  async function toggleChannelHandler(channel: string) {
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
+    const newEnabled = !channels[channel];
+    setChannels({ ...channels, [channel]: newEnabled });
+    await fetch("/api/command-center", { method: "POST", headers, body: JSON.stringify({ channel, enabled: newEnabled }) });
+  }
 
   if (!authed) {
     return (
       <div className={styles.loginPage}>
         <div className={styles.loginCard}>
-          <div className={styles.logo}>🤖</div>
-          <h1>ACQUISITION AGENT</h1>
-          <p>Gerente de Aquisição Digital</p>
+          <div className={styles.logo}>🎯</div>
+          <h1>COMMAND CENTER</h1>
+          <p>Central de Comando da Aquisição</p>
           <form onSubmit={login} className={styles.loginForm}>
-            <input
-              className={styles.input}
-              type="password"
-              placeholder="Senha"
-              value={auth}
-              onChange={(e) => setAuth(e.target.value)}
-              required
-            />
+            <input className={styles.input} type="password" placeholder="Senha" value={auth} onChange={(e) => setAuth(e.target.value)} required />
             {error && <div className={styles.err}>Senha incorreta.</div>}
-            <button type="submit" className={styles.btn} disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
+            <button type="submit" className={styles.btn} disabled={loading}>{loading ? "Entrando..." : "Entrar"}</button>
           </form>
         </div>
       </div>
@@ -166,363 +94,254 @@ export default function AcquisitionPage() {
   return (
     <div className={styles.dashboard}>
       <header className={styles.header}>
-        <h1>🤖 ACQUISITION AGENT</h1>
+        <h1>🎯 COMMAND CENTER</h1>
         <div className={styles.headerActions}>
           <span className={styles.live}>🔴 AO VIVO</span>
           <a href="/admin" className={styles.link}>← Admin</a>
-          <a href="/dashboard" className={styles.link}>Dashboard →</a>
+          <a href="/admin/acquisition" className={styles.link}>Agente →</a>
         </div>
       </header>
 
-      {/* Métricas Principais */}
-      <div className={styles.grid}>
-        <div className={styles.cardBig}>
-          <div className={styles.cardIcon}>👁️</div>
-          <div className={styles.cardValue}>{funnelStats?.totalSessions ?? 0}</div>
-          <div className={styles.cardLabel}>Visitantes</div>
-        </div>
-        <div className={`${styles.cardBig} ${styles.cardGreen}`}>
-          <div className={styles.cardIcon}>📋</div>
-          <div className={styles.cardValue}>{funnelStats?.registered ?? 0}</div>
-          <div className={styles.cardLabel}>Cadastros</div>
-        </div>
-        <div className={`${styles.cardBig} ${styles.cardYellow}`}>
-          <div className={styles.cardIcon}>📱</div>
-          <div className={styles.cardValue}>{funnelStats?.clickedWhatsApp ?? 0}</div>
-          <div className={styles.cardLabel}>Cliques WhatsApp</div>
-        </div>
-        <div className={`${styles.cardBig} ${styles.cardPurple}`}>
-          <div className={styles.cardIcon}>✅</div>
-          <div className={styles.cardValue}>{funnelStats?.joinedWhatsApp ?? 0}</div>
-          <div className={styles.cardLabel}>Entradas WhatsApp</div>
-        </div>
-        <div className={`${styles.cardBig} ${styles.cardGold}`}>
-          <div className={styles.cardIcon}>🔗</div>
-          <div className={styles.cardValue}>{funnelStats?.registered ? Math.round((funnelStats.clickedWhatsApp / funnelStats.registered) * 100) : 0}%</div>
-          <div className={styles.cardLabel}>Taxa de Conversão</div>
+      {/* AQUISIÇÃO HOJE */}
+      <div className={styles.section}>
+        <h2>🚀 AQUISIÇÃO</h2>
+        <div className={styles.grid5}>
+          <div className={styles.cardBig}>
+            <div className={styles.cardIcon}>👁️</div>
+            <div className={styles.cardValue}>{data?.today.visitors ?? 0}</div>
+            <div className={styles.cardLabel}>Visitantes Hoje</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardGreen}`}>
+            <div className={styles.cardIcon}>📋</div>
+            <div className={styles.cardValue}>{data?.today.registrations ?? 0}</div>
+            <div className={styles.cardLabel}>Cadastros Hoje</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardYellow}`}>
+            <div className={styles.cardIcon}>📱</div>
+            <div className={styles.cardValue}>{data?.today.whatsappClicks ?? 0}</div>
+            <div className={styles.cardLabel}>Cliques WhatsApp</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardPurple}`}>
+            <div className={styles.cardIcon}>👥</div>
+            <div className={styles.cardValue}>{data?.today.newMembers ?? 0}</div>
+            <div className={styles.cardLabel}>Novos Membros</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardGold}`}>
+            <div className={styles.cardIcon}>🔗</div>
+            <div className={styles.cardValue}>{data?.today.newReferrals ?? 0}</div>
+            <div className={styles.cardLabel}>Novas Indicações</div>
+          </div>
         </div>
       </div>
 
-      {/* Métricas de Crescimento Viral */}
-      {growthMetrics && (
-        <div className={styles.grid}>
-          <div className={`${styles.cardBig} ${styles.cardGreen}`}>
-            <div className={styles.cardIcon}>👥</div>
-            <div className={styles.cardValue}>{growthMetrics.totalMembers}</div>
-            <div className={styles.cardLabel}>Total Membros</div>
+      {/* FUNIL */}
+      <div className={styles.section}>
+        <h2>📈 FUNIL</h2>
+        <div className={styles.funnelGrid}>
+          <div className={styles.funnelItem}>
+            <div className={styles.funnelBar} style={{ width: "100%" }}></div>
+            <div className={styles.funnelLabel}>Visitantes</div>
+            <div className={styles.funnelValue}>{data?.funnel.visitors ?? 0}</div>
           </div>
-          <div className={`${styles.cardBig} ${styles.cardGold}`}>
-            <div className={styles.cardIcon}>📈</div>
-            <div className={styles.cardValue}>{growthMetrics.viralCoefficient}</div>
-            <div className={styles.cardLabel}>Coeficiente Viral</div>
+          <div className={styles.funnelArrow}>↓ {data?.funnel.registrationRate ?? 0}%</div>
+          <div className={styles.funnelItem}>
+            <div className={styles.funnelBar} style={{ width: `${data?.funnel.registrationRate ?? 0}%` }}></div>
+            <div className={styles.funnelLabel}>Cadastros</div>
+            <div className={styles.funnelValue}>{data?.funnel.registrations ?? 0}</div>
           </div>
+          <div className={styles.funnelArrow}>↓ {data?.funnel.whatsappRate ?? 0}%</div>
+          <div className={styles.funnelItem}>
+            <div className={styles.funnelBar} style={{ width: `${data?.funnel.whatsappRate ?? 0}%` }}></div>
+            <div className={styles.funnelLabel}>Cliques WhatsApp</div>
+            <div className={styles.funnelValue}>{data?.funnel.whatsappClicks ?? 0}</div>
+          </div>
+          <div className={styles.funnelArrow}>↓ {data?.funnel.memberRate ?? 0}%</div>
+          <div className={styles.funnelItem}>
+            <div className={styles.funnelBar} style={{ width: `${data?.funnel.memberRate ?? 0}%` }}></div>
+            <div className={styles.funnelLabel}>Membros</div>
+            <div className={styles.funnelValue}>{data?.funnel.members ?? 0}</div>
+          </div>
+          <div className={styles.funnelArrow}>↓ {data?.funnel.referralRate ?? 0}%</div>
+          <div className={styles.funnelItem}>
+            <div className={styles.funnelBar} style={{ width: `${data?.funnel.referralRate ?? 0}%` }}></div>
+            <div className={styles.funnelLabel}>Indicações</div>
+            <div className={styles.funnelValue}>{data?.funnel.referrals ?? 0}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ORIGEM */}
+      <div className={styles.section}>
+        <h2>🌎 ORIGEM</h2>
+        <div className={styles.originGrid}>
+          {data?.byOrigin.map(o => {
+            const icons: Record<string, string> = { google: "🔍", youtube: "📺", tiktok: "🎵", facebook: "📘", instagram: "📷", pinterest: "📌", reddit: "🤖", indicacao: "🔗", direct: "🔗", outros: "📡" };
+            const names: Record<string, string> = { google: "Google", youtube: "YouTube", tiktok: "TikTok", facebook: "Facebook", instagram: "Instagram", pinterest: "Pinterest", reddit: "Reddit", indicacao: "Indicação", direct: "Direto", outros: "Outros" };
+            const total = data?.total.visitors ?? 1;
+            const pct = Math.round((o.count / total) * 100);
+            return (
+              <div key={o.origin} className={styles.originCard}>
+                <div className={styles.originIcon}>{icons[o.origin] || "📡"}</div>
+                <div className={styles.originName}>{names[o.origin] || o.origin}</div>
+                <div className={styles.originCount}>{o.count}</div>
+                <div className={styles.originBar}>
+                  <div className={styles.originBarFill} style={{ width: `${pct}%` }}></div>
+                </div>
+                <div className={styles.originPct}>{pct}%</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* CAMPEÕES */}
+      <div className={styles.section}>
+        <h2>🏆 CAMPEÕES</h2>
+        <div className={styles.championsGrid}>
+          <div className={styles.championCard}>
+            <div className={styles.championIcon}>📝</div>
+            <div className={styles.championLabel}>Melhor Conteúdo</div>
+            <div className={styles.championValue}>{data?.champions.bestContent?.title || "N/A"}</div>
+            <div className={styles.championScore}>{data?.champions.bestContent?.registrations || 0} cadastros</div>
+          </div>
+          <div className={styles.championCard}>
+            <div className={styles.championIcon}>📢</div>
+            <div className={styles.championLabel}>Melhor Campanha</div>
+            <div className={styles.championValue}>{data?.champions.bestCampaign?.campaign || "N/A"}</div>
+            <div className={styles.championScore}>{data?.champions.bestCampaign?.count || 0} membros</div>
+          </div>
+          <div className={styles.championCard}>
+            <div className={styles.championIcon}>🌐</div>
+            <div className={styles.championLabel}>Melhor Plataforma</div>
+            <div className={styles.championValue}>{data?.champions.bestPlatform?.platform || "N/A"}</div>
+            <div className={styles.championScore}>{data?.champions.bestPlatform?.count || 0} conteúdos</div>
+          </div>
+          <div className={styles.championCard}>
+            <div className={styles.championIcon}>📍</div>
+            <div className={styles.championLabel}>Melhor Cidade</div>
+            <div className={styles.championValue}>{data?.champions.bestCity ? `${data.champions.bestCity.city}/${data.champions.bestCity.state}` : "N/A"}</div>
+            <div className={styles.championScore}>{data?.champions.bestCity?.count || 0} membros</div>
+          </div>
+          <div className={styles.championCard}>
+            <div className={styles.championIcon}>🎯</div>
+            <div className={styles.championLabel}>Melhor CTA</div>
+            <div className={styles.championValue}>{data?.champions.bestCTA?.cta ? `"${data.champions.bestCTA.cta.substring(0, 40)}..."` : "N/A"}</div>
+            <div className={styles.championScore}>{data?.champions.bestCTA?.count || 0} cliques</div>
+          </div>
+        </div>
+      </div>
+
+      {/* AGENTE */}
+      <div className={styles.section}>
+        <h2>🤖 AGENTE</h2>
+        <div className={styles.grid5}>
           <div className={styles.cardBig}>
-            <div className={styles.cardIcon}>🔗</div>
-            <div className={styles.cardValue}>{referralStats?.totalReferrals ?? 0}</div>
-            <div className={styles.cardLabel}>Indicações Totais</div>
+            <div className={styles.cardIcon}>📄</div>
+            <div className={styles.cardValue}>{data?.agent.generated ?? 0}</div>
+            <div className={styles.cardLabel}>Gerados</div>
           </div>
-          <div className={`${styles.cardBig} ${styles.cardPurple}`}>
+          <div className={`${styles.cardBig} ${styles.cardGreen}`}>
             <div className={styles.cardIcon}>✅</div>
-            <div className={styles.cardValue}>{referralStats?.convertedReferrals ?? 0}</div>
-            <div className={styles.cardLabel}>Indicações Convertidas</div>
+            <div className={styles.cardValue}>{data?.agent.published ?? 0}</div>
+            <div className={styles.cardLabel}>Publicados</div>
           </div>
           <div className={`${styles.cardBig} ${styles.cardYellow}`}>
-            <div className={styles.cardIcon}>📊</div>
-            <div className={styles.cardValue}>{referralStats?.conversionRate ?? 0}%</div>
-            <div className={styles.cardLabel}>Taxa Conversão Indicação</div>
+            <div className={styles.cardIcon}>⏳</div>
+            <div className={styles.cardValue}>{data?.agent.pending ?? 0}</div>
+            <div className={styles.cardLabel}>Pendentes</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardRed}`}>
+            <div className={styles.cardIcon}>❌</div>
+            <div className={styles.cardValue}>{data?.agent.errors ?? 0}</div>
+            <div className={styles.cardLabel}>Erros</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardPurple}`}>
+            <div className={styles.cardIcon}>⏰</div>
+            <div className={styles.cardValue} style={{ fontSize: "14px" }}>{data?.agent.nextExecution || "N/A"}</div>
+            <div className={styles.cardLabel}>Próxima Execução</div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Top Indicadores */}
-      {referralStats && referralStats.topReferrers.length > 0 && (
-        <div className={styles.section}>
-          <h2>🏆 Top Indicadores</h2>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Nome</th>
-                  <th>Cidade</th>
-                  <th>Indicações</th>
-                  <th>Conversões</th>
-                  <th>Taxa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {referralStats.topReferrers.map((r, i) => (
-                  <tr key={r.referrer_uid}>
-                    <td>{i + 1}</td>
-                    <td style={{ fontWeight: 700 }}>{r.name}</td>
-                    <td>{r.city}, {r.state}</td>
-                    <td>{r.total_referrals}</td>
-                    <td>{r.conversions}</td>
-                    <td>{r.total_referrals > 0 ? Math.round((r.conversions / r.total_referrals) * 100) : 0}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* META */}
+      <div className={styles.section}>
+        <h2>🎯 META</h2>
+        <div className={styles.goalSection}>
+          <div className={styles.goalInfo}>
+            <div className={styles.goalText}>
+              <span>Meta: <strong>{data?.goal.target?.toLocaleString() || "1.000"}</strong> membros</span>
+              <span>Atuais: <strong>{data?.goal.current || 0}</strong></span>
+              <span>Faltam: <strong>{data?.goal.remaining || 0}</strong></span>
+            </div>
+            <div className={styles.goalPct}>{data?.goal.progress ?? 0}%</div>
+          </div>
+          <div className={styles.goalBar}>
+            <div className={styles.goalBarFill} style={{ width: `${Math.min(data?.goal.progress ?? 0, 100)}%` }}></div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Indicações por Plataforma */}
-      {referralStats && referralStats.byPlatform.length > 0 && (
-        <div className={styles.section}>
-          <h2>📱 Indicações por Plataforma</h2>
-          <div className={styles.sourceGrid}>
-            {referralStats.byPlatform.map(p => (
-              <div key={p.platform} className={styles.sourceCard}>
-                <div className={styles.sourceValue}>{p.total}</div>
-                <div className={styles.sourceLabel}>{p.platform}</div>
-                <div className={styles.sourceConversions}>{p.converted} conversões</div>
+      {/* CANAIS */}
+      <div className={styles.section}>
+        <h2>📡 CANAIS</h2>
+        <p className={styles.sectionDesc}>Ative/desative canais de aquisição individualmente</p>
+        <div className={styles.channelsGrid}>
+          {Object.entries(channels).map(([ch, enabled]) => {
+            const names: Record<string, string> = { google: "Google", youtube: "YouTube", tiktok: "TikTok", facebook: "Facebook", instagram: "Instagram", pinterest: "Pinterest", reddit: "Reddit", whatsapp: "WhatsApp", indicacao: "Indicação", direto: "Direto", outros: "Outros" };
+            const icons: Record<string, string> = { google: "🔍", youtube: "📺", tiktok: "🎵", facebook: "📘", instagram: "📷", pinterest: "📌", reddit: "🤖", whatsapp: "💬", indicacao: "🔗", direto: "🔗", outros: "📡" };
+            return (
+              <button key={ch} className={`${styles.channelBtn} ${enabled ? styles.channelEnabled : styles.channelDisabled}`} onClick={() => toggleChannelHandler(ch)}>
+                <span>{icons[ch] || "📡"}</span>
+                <span>{names[ch] || ch}</span>
+                <span className={styles.channelStatus}>{enabled ? "ATIVO" : "INATIVO"}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ALERTAS */}
+      <div className={styles.section}>
+        <h2>🔔 ALERTAS</h2>
+        {alerts.length === 0 ? (
+          <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "20px" }}>Nenhum alerta no momento</p>
+        ) : (
+          <div className={styles.alertsList}>
+            {alerts.map((alert, i) => (
+              <div key={i} className={`${styles.alertCard} ${styles[`alert${alert.severity}`]}`}>
+                <div className={styles.alertIcon}>
+                  {alert.severity === "success" ? "✅" : alert.severity === "warning" ? "⚠️" : alert.severity === "error" ? "❌" : "ℹ️"}
+                </div>
+                <div className={styles.alertContent}>
+                  <div className={styles.alertMessage}>{alert.message}</div>
+                  <div className={styles.alertTime}>{new Date(alert.timestamp).toLocaleTimeString("pt-BR")}</div>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Crescimento por Dia */}
-      {growthMetrics && growthMetrics.last7Days.length > 0 && (
-        <div className={styles.section}>
-          <h2>📈 Crescimento (Últimos 7 Dias)</h2>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Dia</th>
-                  <th>Novos Membros</th>
-                  <th>Indicações</th>
-                  <th>Convertidos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {growthMetrics.last7Days.map(day => {
-                  const refDay = referralStats?.byDay.find(r => r.day === day.day);
-                  return (
-                    <tr key={day.day}>
-                      <td>{new Date(day.day).toLocaleDateString("pt-BR")}</td>
-                      <td style={{ fontWeight: 700, color: "#4ade80" }}>{day.count}</td>
-                      <td>{refDay?.total ?? 0}</td>
-                      <td>{refDay?.converted ?? 0}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Melhores Colocados */}
-      <div className={styles.section}>
-        <h2>🏆 Melhores Colocados</h2>
-        <div className={styles.winnersGrid}>
-          <div className={styles.winnerCard}>
-            <div className={styles.winnerIcon}>📝</div>
-            <div className={styles.winnerLabel}>Melhor Conteúdo</div>
-            <div className={styles.winnerValue}>{contentStats?.bestContent?.title || "N/A"}</div>
-            <div className={styles.winnerScore}>Score: {contentStats?.bestContent?.score || 0}</div>
-          </div>
-          <div className={styles.winnerCard}>
-            <div className={styles.winnerIcon}>🌐</div>
-            <div className={styles.winnerLabel}>Melhor Plataforma</div>
-            <div className={styles.winnerValue}>{contentStats?.byPlatform?.[0]?.platform || "N/A"}</div>
-            <div className={styles.winnerScore}>Score: {contentStats?.byPlatform?.[0]?.avg_score || 0}</div>
-          </div>
-          <div className={styles.winnerCard}>
-            <div className={styles.winnerIcon}>🎯</div>
-            <div className={styles.winnerLabel}>Melhor Tema</div>
-            <div className={styles.winnerValue}>{contentStats?.byTheme?.[0]?.theme || "N/A"}</div>
-            <div className={styles.winnerScore}>Score: {contentStats?.byTheme?.[0]?.avg_score || 0}</div>
-          </div>
-          <div className={styles.winnerCard}>
-            <div className={styles.winnerIcon}>📢</div>
-            <div className={styles.winnerLabel}>Melhor Campanha</div>
-            <div className={styles.winnerValue}>{funnelStats?.bySource?.[0]?.source || "N/A"}</div>
-            <div className={styles.winnerScore}>Sessões: {funnelStats?.bySource?.[0]?.sessions || 0}</div>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Performance por Plataforma */}
+      {/* TOP CIDADES */}
       <div className={styles.section}>
-        <h2>📊 Performance por Plataforma</h2>
+        <h2>📍 TOP CIDADES</h2>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Plataforma</th>
-                <th>Conteúdos</th>
-                <th>Visitantes</th>
-                <th>Cadastros</th>
-                <th>WhatsApp</th>
-                <th>Entradas</th>
-                <th>Score</th>
+                <th>#</th>
+                <th>Cidade</th>
+                <th>Estado</th>
+                <th>Membros</th>
               </tr>
             </thead>
             <tbody>
-              {contentStats?.byPlatform?.map((p) => (
-                <tr key={p.platform}>
-                  <td><strong>{p.platform}</strong></td>
-                  <td>{p.count}</td>
-                  <td>{p.sessions}</td>
-                  <td>{p.registrations}</td>
-                  <td>{p.whatsapp_clicks}</td>
-                  <td>{p.whatsapp_joins}</td>
-                  <td>
-                    <span className={`${styles.scoreBadge} ${p.avg_score > 50 ? styles.scoreGood : p.avg_score > 30 ? styles.scoreMedium : styles.scoreBad}`}>
-                      {p.avg_score}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Performance por Tema */}
-      <div className={styles.section}>
-        <h2>🎯 Performance por Tema</h2>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Tema</th>
-                <th>Conteúdos</th>
-                <th>Visitantes</th>
-                <th>Cadastros</th>
-                <th>Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contentStats?.byTheme?.map((t) => (
-                <tr key={t.theme}>
-                  <td><strong>{t.theme}</strong></td>
-                  <td>{t.count}</td>
-                  <td>{t.sessions}</td>
-                  <td>{t.registrations}</td>
-                  <td>
-                    <span className={`${styles.scoreBadge} ${t.avg_score > 50 ? styles.scoreGood : t.avg_score > 30 ? styles.scoreMedium : styles.scoreBad}`}>
-                      {t.avg_score}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* PRÓXIMAS AÇÕES RECOMENDADAS */}
-      <div className={styles.section}>
-        <h2>🎯 PRÓXIMAS AÇÕES RECOMENDADAS</h2>
-        <div className={styles.recommendationsGrid}>
-          <div className={styles.recCard}>
-            <div className={styles.recPriority}>1</div>
-            <div className={styles.recContent}>
-              <div className={styles.recAction}>Criar 5 conteúdos sobre {contentStats?.byTheme?.[0]?.theme || "oportunidade"} para {contentStats?.byPlatform?.[0]?.platform || "google"}</div>
-              <div className={styles.recReason}>Melhor plataforma e tema identificados pela análise</div>
-            </div>
-          </div>
-          <div className={styles.recCard}>
-            <div className={styles.recPriority}>2</div>
-            <div className={styles.recContent}>
-              <div className={styles.recAction}>Reforçar as landing pages com mais tráfego</div>
-              <div className={styles.recReason}>Aumentar conversão nas páginas já existentes</div>
-            </div>
-          </div>
-          <div className={styles.recCard}>
-            <div className={styles.recPriority}>3</div>
-            <div className={styles.recContent}>
-              <div className={styles.recAction}>Publicar mais vídeos curtos no TikTok e Instagram</div>
-              <div className={styles.recReason}>Formato com maior engajamento no público-alvo</div>
-            </div>
-          </div>
-          <div className={styles.recCard}>
-            <div className={styles.recPriority}>4</div>
-            <div className={styles.recContent}>
-              <div className={styles.recAction}>Testar novo CTA: &quot;Garanta sua vaga agora&quot;</div>
-              <div className={styles.recReason}>CTAs com urgência tendem a ter maior taxa de conversão</div>
-            </div>
-          </div>
-          <div className={styles.recCard}>
-            <div className={styles.recPriority}>5</div>
-            <div className={styles.recContent}>
-              <div className={styles.recAction}>Reduzir conteúdos com score abaixo de 30</div>
-              <div className={styles.recReason}>Focar recursos nos formatos vencedores</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Logs do Agente */}
-      <div className={styles.section}>
-        <h2>📋 Logs do Agente</h2>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Ação</th>
-                <th>Detalhes</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.slice(0, 10).map((log) => (
-                <tr key={log.id}>
-                  <td>{new Date(log.created_at).toLocaleDateString("pt-BR")}</td>
-                  <td><strong>{log.action}</strong></td>
-                  <td>{log.details}</td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${log.status === "success" ? styles.statusSuccess : styles.statusError}`}>
-                      {log.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Fontes de Tráfego */}
-      <div className={styles.section}>
-        <h2>🌐 Fontes de Tráfego</h2>
-        <div className={styles.sourceGrid}>
-          {funnelStats?.bySource?.map((s) => (
-            <div key={s.source} className={styles.sourceCard}>
-              <div className={styles.sourceValue}>{s.sessions}</div>
-              <div className={styles.sourceLabel}>{s.source}</div>
-              <div className={styles.sourceConversions}>{s.registrations} cadastros</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Landing Pages */}
-      <div className={styles.section}>
-        <h2>📄 Melhores Landing Pages</h2>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Página</th>
-                <th>Visitantes</th>
-                <th>Cadastros</th>
-                <th>Taxa</th>
-              </tr>
-            </thead>
-            <tbody>
-              {funnelStats?.byLandingPage?.map((p) => (
-                <tr key={p.landing_page}>
-                  <td><strong>{p.landing_page}</strong></td>
-                  <td>{p.sessions}</td>
-                  <td>{p.registrations}</td>
-                  <td>{p.sessions > 0 ? Math.round((p.registrations / p.sessions) * 100) : 0}%</td>
+              {(data?.byCity || []).map((c, i) => (
+                <tr key={`${c.city}-${c.state}`}>
+                  <td>{i + 1}</td>
+                  <td style={{ fontWeight: 700 }}>{c.city}</td>
+                  <td>{c.state}</td>
+                  <td>{c.count}</td>
                 </tr>
               ))}
             </tbody>

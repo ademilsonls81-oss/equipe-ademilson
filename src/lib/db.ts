@@ -668,4 +668,244 @@ export function getGrowthMetrics() {
   };
 }
 
+export function getCommandCenterData() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+  const GOAL = 1000;
+
+  const visitorsToday = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE date(created_at) = ?").get(today) as any).c;
+  const registrationsToday = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = ?").get(today) as any).c;
+  const whatsappClicksToday = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE clicked_whatsapp = 1 AND date(created_at) = ?").get(today) as any).c;
+  const newMembersToday = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = ?").get(today) as any).c;
+  const newReferralsToday = (db.prepare("SELECT COUNT(*) as c FROM referral_tracking WHERE date(created_at) = ?").get(today) as any).c;
+
+  const totalVisitors = (db.prepare("SELECT COUNT(*) as c FROM sessions").get() as any).c;
+  const totalRegistrations = (db.prepare("SELECT COUNT(*) as c FROM registrations").get() as any).c;
+  const totalWhatsappClicks = (db.prepare("SELECT COUNT(*) as c FROM sessions WHERE clicked_whatsapp = 1").get() as any).c;
+  const totalMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations").get() as any).c;
+  const totalReferrals = (db.prepare("SELECT COUNT(*) as c FROM referral_tracking").get() as any).c;
+
+  const funnel = {
+    visitors: totalVisitors,
+    registrations: totalRegistrations,
+    whatsappClicks: totalWhatsappClicks,
+    members: totalMembers,
+    referrals: totalReferrals,
+    registrationRate: totalVisitors > 0 ? Math.round((totalRegistrations / totalVisitors) * 100) : 0,
+    whatsappRate: totalRegistrations > 0 ? Math.round((totalWhatsappClicks / totalRegistrations) * 100) : 0,
+    memberRate: totalWhatsappClicks > 0 ? Math.round((totalMembers / totalWhatsappClicks) * 100) : 0,
+    referralRate: totalMembers > 0 ? Math.round((totalReferrals / totalMembers) * 100) : 0,
+  };
+
+  const byOrigin = db.prepare(`
+    SELECT 
+      COALESCE(utm_source, 'direct') as origin,
+      COUNT(*) as count,
+      SUM(CASE WHEN clicked_whatsapp = 1 THEN 1 ELSE 0 END) as whatsapp_clicks
+    FROM sessions 
+    GROUP BY origin 
+    ORDER BY count DESC
+  `).all() as { origin: string; count: number; whatsapp_clicks: number }[];
+
+  const byCity = db.prepare(`
+    SELECT city, state, COUNT(*) as count 
+    FROM registrations 
+    GROUP BY city, state 
+    ORDER BY count DESC 
+    LIMIT 10
+  `).all() as { city: string; state: string; count: number }[];
+
+  const bestContent = db.prepare(`
+    SELECT title, score, registrations, whatsapp_clicks 
+    FROM content_performance 
+    ORDER BY registrations DESC 
+    LIMIT 1
+  `).get() as any;
+
+  const bestCampaign = db.prepare(`
+    SELECT utm_campaign as campaign, COUNT(*) as count 
+    FROM registrations 
+    WHERE utm_campaign IS NOT NULL AND utm_campaign != ''
+    GROUP BY utm_campaign 
+    ORDER BY count DESC 
+    LIMIT 1
+  `).get() as any;
+
+  const bestPlatform = db.prepare(`
+    SELECT platform, COUNT(*) as count 
+    FROM content_performance 
+    GROUP BY platform 
+    ORDER BY count DESC 
+    LIMIT 1
+  `).get() as any;
+
+  const bestCity = byCity[0] || null;
+
+  const bestCTA = db.prepare(`
+    SELECT share_text as cta, COUNT(*) as count 
+    FROM referral_tracking 
+    WHERE share_text IS NOT NULL 
+    GROUP BY share_text 
+    ORDER BY count DESC 
+    LIMIT 1
+  `).get() as any;
+
+  const contentGenerated = (db.prepare("SELECT COUNT(*) as c FROM content_performance").get() as any).c;
+  const contentPublished = (db.prepare("SELECT COUNT(*) as c FROM content_performance WHERE status = 'published'").get() as any).c;
+  const contentPending = (db.prepare("SELECT COUNT(*) as c FROM content_performance WHERE status = 'pending'").get() as any).c;
+  const contentErrors = (db.prepare("SELECT COUNT(*) as c FROM content_performance WHERE status = 'error'").get() as any).c;
+  const nextExecution = getAgentConfig("next_execution") || "Não agendado";
+
+  const progress = Math.round((totalMembers / GOAL) * 100);
+  const remaining = Math.max(0, GOAL - totalMembers);
+
+  return {
+    today: {
+      visitors: visitorsToday,
+      registrations: registrationsToday,
+      whatsappClicks: whatsappClicksToday,
+      newMembers: newMembersToday,
+      newReferrals: newReferralsToday,
+    },
+    total: {
+      visitors: totalVisitors,
+      registrations: totalRegistrations,
+      whatsappClicks: totalWhatsappClicks,
+      members: totalMembers,
+      referrals: totalReferrals,
+    },
+    funnel,
+    byOrigin,
+    byCity,
+    champions: {
+      bestContent: bestContent ? { title: bestContent.title, score: bestContent.score, registrations: bestContent.registrations } : null,
+      bestCampaign: bestCampaign ? { campaign: bestCampaign.campaign, count: bestCampaign.count } : null,
+      bestPlatform: bestPlatform ? { platform: bestPlatform.platform, count: bestPlatform.count } : null,
+      bestCity: bestCity ? { city: bestCity.city, state: bestCity.state, count: bestCity.count } : null,
+      bestCTA: bestCTA ? { cta: bestCTA.cta, count: bestCTA.count } : null,
+    },
+    agent: {
+      generated: contentGenerated,
+      published: contentPublished,
+      pending: contentPending,
+      errors: contentErrors,
+      nextExecution,
+    },
+    goal: {
+      target: GOAL,
+      current: totalMembers,
+      remaining,
+      progress,
+    },
+  };
+}
+
+export function getAlerts() {
+  const db = getDb();
+  const alerts: { type: string; severity: string; message: string; timestamp: string }[] = [];
+
+  const highConversionCampaign = db.prepare(`
+    SELECT utm_campaign, COUNT(*) as count 
+    FROM registrations 
+    WHERE date(created_at) = date('now') AND utm_campaign IS NOT NULL
+    GROUP BY utm_campaign 
+    HAVING count > 10
+  `).all() as { utm_campaign: string; count: number }[];
+
+  highConversionCampaign.forEach(c => {
+    alerts.push({
+      type: "high_conversion",
+      severity: "success",
+      message: `Campanha "${c.utm_campaign}" converteu ${c.count} membros hoje!`,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  const highTrafficPage = db.prepare(`
+    SELECT landing_page, COUNT(*) as count 
+    FROM sessions 
+    WHERE date(created_at) = date('now')
+    GROUP BY landing_page 
+    HAVING count > 50
+  `).all() as { landing_page: string; count: number }[];
+
+  highTrafficPage.forEach(p => {
+    alerts.push({
+      type: "high_traffic",
+      severity: "info",
+      message: `Página "${p.landing_page}" recebeu ${p.count} visitantes hoje!`,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  const contentPerformance = db.prepare(`
+    SELECT title, whatsapp_clicks 
+    FROM content_performance 
+    WHERE date(created_at) = date('now') AND whatsapp_clicks > 5
+  `).all() as { title: string; whatsapp_clicks: number }[];
+
+  contentPerformance.forEach(c => {
+    alerts.push({
+      type: "content_performance",
+      severity: "success",
+      message: `Conteúdo "${c.title}" gerou ${c.whatsapp_clicks} cliques no WhatsApp!`,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  const agentErrors = db.prepare(`
+    SELECT action, error_message 
+    FROM agent_logs 
+    WHERE status = 'error' AND date(created_at) = date('now')
+    LIMIT 5
+  `).all() as { action: string; error_message: string }[];
+
+  agentErrors.forEach(e => {
+    alerts.push({
+      type: "agent_error",
+      severity: "error",
+      message: `Erro no agente: ${e.action} - ${e.error_message}`,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  const yesterdayMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now','-1 day')").get() as any).c;
+  const todayMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now')").get() as any).c;
+  if (yesterdayMembers > 0 && todayMembers < yesterdayMembers * 0.5) {
+    alerts.push({
+      type: "conversion_drop",
+      severity: "warning",
+      message: `Queda de conversão: ${todayMembers} membros hoje vs ${yesterdayMembers} ontem`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  return alerts.sort((a, b) => {
+    const severityOrder: Record<string, number> = { error: 0, warning: 1, success: 2, info: 3 };
+    return (severityOrder[a.severity] || 4) - (severityOrder[b.severity] || 4);
+  });
+}
+
+export function getChannelStatus() {
+  const db = getDb();
+  return {
+    google: getAgentConfig("channel_google") !== "false",
+    youtube: getAgentConfig("channel_youtube") !== "false",
+    tiktok: getAgentConfig("channel_tiktok") !== "false",
+    facebook: getAgentConfig("channel_facebook") !== "false",
+    instagram: getAgentConfig("channel_instagram") !== "false",
+    pinterest: getAgentConfig("channel_pinterest") !== "false",
+    reddit: getAgentConfig("channel_reddit") !== "false",
+    whatsapp: getAgentConfig("channel_whatsapp") !== "false",
+    indicacao: getAgentConfig("channel_indicacao") !== "false",
+    direto: getAgentConfig("channel_direto") !== "false",
+    outros: getAgentConfig("channel_outros") !== "false",
+  };
+}
+
+export function toggleChannel(channel: string, enabled: boolean) {
+  const db = getDb();
+  setAgentConfig(`channel_${channel}`, enabled ? "true" : "false");
+}
+
 export default getDb;
