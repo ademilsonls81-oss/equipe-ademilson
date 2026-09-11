@@ -92,6 +92,52 @@
 
 .shareSection { text-align: center; }
 .shareSection h3 { font-size: 18px; margin-bottom: 16px; }
+
+.variantSelector {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.variantBtn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.variantBtn:hover { background: rgba(255,255,255,0.1); color: var(--white); }
+.variantActive {
+  background: rgba(212,160,23,0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.messagePreview {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+.messageText {
+  font-size: 15px;
+  color: var(--white);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.messageUrl {
+  font-size: 13px;
+  color: var(--gold);
+  word-break: break-all;
+}
+
 .linkBox {
   display: flex;
   align-items: center;
@@ -135,13 +181,11 @@
   font-size: 14px;
   font-weight: 600;
   color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
 }
-.whatsapp { background: #25d366; }
-.whatsapp:hover { opacity: 0.9; }
-.twitter { background: #1da1f2; }
-.twitter:hover { opacity: 0.9; }
-.facebook { background: #1877f2; }
-.facebook:hover { opacity: 0.9; }
+.shareBtn:hover { opacity: 0.9; }
 
 .rankingSection { padding: 60px 0; }
 .rankingList {

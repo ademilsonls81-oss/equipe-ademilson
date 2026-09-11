@@ -80,6 +80,15 @@ export default function RegisterForm({ refCode }: { refCode?: string }) {
       if (!res.ok) throw new Error(data.error || "Erro ao cadastrar.");
       setMyCode(data.referral_code || "");
       setStatus("success");
+
+      if (refCode && sessionId) {
+        fetch("/api/referral-tracking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "convert", visitor_session_id: sessionId, converted_uid: data.uid || "" }),
+        }).catch(() => {});
+      }
+
       if (typeof window !== "undefined") {
         if ((window as any).gtag) {
           (window as any).gtag("event", "form_submit", { event_label: "register_success" });

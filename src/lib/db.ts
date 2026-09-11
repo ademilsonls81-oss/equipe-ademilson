@@ -89,6 +89,49 @@ function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_cp_platform ON content_performance(platform);
     CREATE INDEX IF NOT EXISTS idx_cp_status ON content_performance(status);
     CREATE INDEX IF NOT EXISTS idx_cp_theme ON content_performance(theme);
+    CREATE TABLE IF NOT EXISTS referral_tracking (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      referrer_uid TEXT NOT NULL,
+      referral_code TEXT NOT NULL,
+      link_used TEXT,
+      utm_source TEXT,
+      utm_medium TEXT,
+      utm_campaign TEXT,
+      platform TEXT,
+      share_text TEXT,
+      ab_test_id TEXT,
+      visitor_session_id TEXT,
+      converted INTEGER DEFAULT 0,
+      converted_uid TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (referrer_uid) REFERENCES registrations(uid)
+    );
+    CREATE INDEX IF NOT EXISTS idx_rt_referrer ON referral_tracking(referrer_uid);
+    CREATE INDEX IF NOT EXISTS idx_rt_code ON referral_tracking(referral_code);
+    CREATE INDEX IF NOT EXISTS idx_rt_ab ON referral_tracking(ab_test_id);
+    CREATE TABLE IF NOT EXISTS ab_tests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      test_id TEXT UNIQUE NOT NULL,
+      test_name TEXT NOT NULL,
+      test_type TEXT NOT NULL,
+      variant_a TEXT NOT NULL,
+      variant_b TEXT NOT NULL,
+      metric TEXT DEFAULT 'conversion',
+      status TEXT DEFAULT 'active',
+      winner TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ended_at DATETIME
+    );
+    CREATE INDEX IF NOT EXISTS idx_ab_test ON ab_tests(test_id);
+    CREATE TABLE IF NOT EXISTS ab_assignments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      test_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      variant TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(test_id, session_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_aba_test ON ab_assignments(test_id);
     CREATE TABLE IF NOT EXISTS agent_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       agent_type TEXT NOT NULL,
@@ -429,6 +472,200 @@ export function getAgentConfig(key: string) {
 export function setAgentConfig(key: string, value: string) {
   const db = getDb();
   db.prepare("INSERT OR REPLACE INTO agent_config (config_key, config_value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)").run(key, value);
+}
+
+export function createReferralTracking(data: {
+  referrer_uid: string;
+  referral_code: string;
+  link_used?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  platform?: string;
+  share_text?: string;
+  ab_test_id?: string;
+  visitor_session_id?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT INTO referral_tracking (referrer_uid, referral_code, link_used, utm_source, utm_medium, utm_campaign, platform, share_text, ab_test_id, visitor_session_id)
+    VALUES (@referrer_uid, @referral_code, @link_used, @utm_source, @utm_medium, @utm_campaign, @platform, @share_text, @ab_test_id, @visitor_session_id)`).run(data);
+}
+
+export function markReferralConverted(visitorSessionId: string, convertedUid: string) {
+  const db = getDb();
+  db.prepare("UPDATE referral_tracking SET converted = 1, converted_uid = ? WHERE visitor_session_id = ? AND converted = 0").run(convertedUid, visitorSessionId);
+}
+
+export function getReferralStatsAdvanced() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+
+  const totalReferrals = (db.prepare("SELECT COUNT(*) as c FROM referral_tracking").get() as any).c;
+  const convertedReferrals = (db.prepare("SELECT COUNT(*) as c FROM referral_tracking WHERE converted = 1").get() as any).c;
+  const referralsToday = (db.prepare("SELECT COUNT(*) as c FROM referral_tracking WHERE date(created_at) = ?").get(today) as any).c;
+  const convertedToday = (db.prepare("SELECT COUNT(*) as c FROM referral_tracking WHERE converted = 1 AND date(created_at) = ?").get(today) as any).c;
+
+  const byPlatform = db.prepare(
+    "SELECT platform, COUNT(*) as total, SUM(CASE WHEN converted = 1 THEN 1 ELSE 0 END) as converted FROM referral_tracking WHERE platform IS NOT NULL GROUP BY platform ORDER BY total DESC"
+  ).all() as { platform: string; total: number; converted: number }[];
+
+  const bySource = db.prepare(
+    "SELECT utm_source as source, COUNT(*) as total, SUM(CASE WHEN converted = 1 THEN 1 ELSE 0 END) as converted FROM referral_tracking WHERE utm_source IS NOT NULL GROUP BY utm_source ORDER BY total DESC"
+  ).all() as { source: string; total: number; converted: number }[];
+
+  const topReferrers = db.prepare(`
+    SELECT rt.referrer_uid, r.name, r.city, r.state, COUNT(*) as total_referrals,
+      SUM(CASE WHEN rt.converted = 1 THEN 1 ELSE 0 END) as conversions
+    FROM referral_tracking rt
+    JOIN registrations r ON r.uid = rt.referrer_uid
+    GROUP BY rt.referrer_uid
+    ORDER BY conversions DESC
+    LIMIT 10
+  `).all() as { referrer_uid: string; name: string; city: string; state: string; total_referrals: number; conversions: number }[];
+
+  const byDay = db.prepare(
+    "SELECT date(created_at) as day, COUNT(*) as total, SUM(CASE WHEN converted = 1 THEN 1 ELSE 0 END) as converted FROM referral_tracking WHERE created_at >= datetime('now','-30 days') GROUP BY date(created_at) ORDER BY day"
+  ).all() as { day: string; total: number; converted: number }[];
+
+  const growthCoefficient = totalReferrals > 0 ? (convertedReferrals / totalReferrals) : 0;
+
+  return {
+    totalReferrals,
+    convertedReferrals,
+    referralsToday,
+    convertedToday,
+    conversionRate: totalReferrals > 0 ? Math.round((convertedReferrals / totalReferrals) * 100) : 0,
+    growthCoefficient: Math.round(growthCoefficient * 100) / 100,
+    byPlatform,
+    bySource,
+    topReferrers,
+    byDay,
+  };
+}
+
+export function createABTest(data: {
+  test_id: string;
+  test_name: string;
+  test_type: string;
+  variant_a: string;
+  variant_b: string;
+  metric?: string;
+}) {
+  const db = getDb();
+  db.prepare(`INSERT OR IGNORE INTO ab_tests (test_id, test_name, test_type, variant_a, variant_b, metric)
+    VALUES (@test_id, @test_name, @test_type, @variant_a, @variant_b, @metric)`).run({
+    ...data,
+    metric: data.metric || "conversion",
+  });
+}
+
+export function assignABVariant(testId: string, sessionId: string): string {
+  const db = getDb();
+  const existing = db.prepare("SELECT variant FROM ab_assignments WHERE test_id = ? AND session_id = ?").get(testId, sessionId) as any;
+  if (existing) return existing.variant;
+
+  const variant = Math.random() < 0.5 ? "A" : "B";
+  db.prepare("INSERT OR IGNORE INTO ab_assignments (test_id, session_id, variant) VALUES (?, ?, ?)").run(testId, sessionId, variant);
+  return variant;
+}
+
+export function recordABConversion(testId: string, sessionId: string) {
+  const db = getDb();
+  const assignment = db.prepare("SELECT variant FROM ab_assignments WHERE test_id = ? AND session_id = ?").get(testId, sessionId) as any;
+  if (!assignment) return;
+
+  const test = db.prepare("SELECT * FROM ab_tests WHERE test_id = ?").get(testId) as any;
+  if (!test) return;
+
+  const variantAConversions = (db.prepare(
+    "SELECT COUNT(*) as c FROM ab_assignments aa WHERE aa.test_id = ? AND aa.variant = 'A' AND aa.session_id IN (SELECT visitor_session_id FROM referral_tracking WHERE converted = 1)"
+  ).get(testId) as any).c;
+
+  const variantBConversions = (db.prepare(
+    "SELECT COUNT(*) as c FROM ab_assignments aa WHERE aa.test_id = ? AND aa.variant = 'B' AND aa.session_id IN (SELECT visitor_session_id FROM referral_tracking WHERE converted = 1)"
+  ).get(testId) as any).c;
+
+  const variantATotal = (db.prepare(
+    "SELECT COUNT(*) as c FROM ab_assignments WHERE test_id = ? AND variant = 'A'"
+  ).get(testId) as any).c;
+
+  const variantBTotal = (db.prepare(
+    "SELECT COUNT(*) as c FROM ab_assignments WHERE test_id = ? AND variant = 'B'"
+  ).get(testId) as any).c;
+
+  const rateA = variantATotal > 0 ? variantAConversions / variantATotal : 0;
+  const rateB = variantBTotal > 0 ? variantBConversions / variantBTotal : 0;
+
+  let winner = null;
+  if (variantATotal >= 10 && variantBTotal >= 10) {
+    if (rateA > rateB * 1.1) winner = "A";
+    else if (rateB > rateA * 1.1) winner = "B";
+  }
+
+  if (winner) {
+    db.prepare("UPDATE ab_tests SET winner = ?, ended_at = CURRENT_TIMESTAMP WHERE test_id = ? AND winner IS NULL").run(winner, testId);
+  }
+
+  return { variantA: { conversions: variantAConversions, total: variantATotal, rate: rateA }, variantB: { conversions: variantBConversions, total: variantBTotal, rate: rateB }, winner };
+}
+
+export function getABTests() {
+  const db = getDb();
+  return db.prepare("SELECT * FROM ab_tests ORDER BY created_at DESC").all() as any[];
+}
+
+export function getABTestResults(testId: string) {
+  const db = getDb();
+  const test = db.prepare("SELECT * FROM ab_tests WHERE test_id = ?").get(testId) as any;
+  if (!test) return null;
+
+  const variantA = db.prepare(
+    "SELECT COUNT(*) as total FROM ab_assignments WHERE test_id = ? AND variant = 'A'"
+  ).get(testId) as any;
+
+  const variantB = db.prepare(
+    "SELECT COUNT(*) as total FROM ab_assignments WHERE test_id = ? AND variant = 'B'"
+  ).get(testId) as any;
+
+  return { ...test, variantA: variantA.total, variantB: variantB.total };
+}
+
+export function getGrowthMetrics() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+
+  const totalMembers = (db.prepare("SELECT COUNT(*) as c FROM registrations").get() as any).c;
+  const membersToday = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = ?").get(today) as any).c;
+  const membersYesterday = (db.prepare("SELECT COUNT(*) as c FROM registrations WHERE date(created_at) = date('now','-1 day')").get() as any).c;
+
+  const referralMembers = (db.prepare(
+    "SELECT COUNT(*) as c FROM registrations WHERE referral_code IS NOT NULL AND referral_code != ''"
+  ).get() as any).c;
+
+  const directMembers = totalMembers - referralMembers;
+
+  const last7Days = db.prepare(
+    "SELECT date(created_at) as day, COUNT(*) as count FROM registrations WHERE created_at >= datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day"
+  ).all() as { day: string; count: number }[];
+
+  const last30Days = db.prepare(
+    "SELECT date(created_at) as day, COUNT(*) as count FROM registrations WHERE created_at >= datetime('now','-30 days') GROUP BY date(created_at) ORDER BY day"
+  ).all() as { day: string; count: number }[];
+
+  const growthRate = membersYesterday > 0 ? ((membersToday - membersYesterday) / membersYesterday * 100) : 0;
+  const viralCoefficient = totalMembers > 0 ? (referralMembers / totalMembers) : 0;
+
+  return {
+    totalMembers,
+    membersToday,
+    membersYesterday,
+    referralMembers,
+    directMembers,
+    growthRate: Math.round(growthRate * 10) / 10,
+    viralCoefficient: Math.round(viralCoefficient * 100) / 100,
+    last7Days,
+    last30Days,
+  };
 }
 
 export default getDb;

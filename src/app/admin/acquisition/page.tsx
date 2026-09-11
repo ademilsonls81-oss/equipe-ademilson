@@ -30,6 +30,31 @@ type FunnelStats = {
   byLandingPage: { landing_page: string; sessions: number; registrations: number }[];
 };
 
+type GrowthMetrics = {
+  totalMembers: number;
+  membersToday: number;
+  membersYesterday: number;
+  referralMembers: number;
+  directMembers: number;
+  growthRate: number;
+  viralCoefficient: number;
+  last7Days: { day: string; count: number }[];
+  last30Days: { day: string; count: number }[];
+};
+
+type ReferralStats = {
+  totalReferrals: number;
+  convertedReferrals: number;
+  referralsToday: number;
+  convertedToday: number;
+  conversionRate: number;
+  growthCoefficient: number;
+  byPlatform: { platform: string; total: number; converted: number }[];
+  bySource: { source: string; total: number; converted: number }[];
+  topReferrers: { referrer_uid: string; name: string; city: string; state: string; total_referrals: number; conversions: number }[];
+  byDay: { day: string; total: number; converted: number }[];
+};
+
 type AgentLog = {
   id: number;
   agent_type: string;
@@ -53,6 +78,8 @@ export default function AcquisitionPage() {
   const [authed, setAuthed] = useState(false);
   const [contentStats, setContentStats] = useState<ContentStats | null>(null);
   const [funnelStats, setFunnelStats] = useState<FunnelStats | null>(null);
+  const [growthMetrics, setGrowthMetrics] = useState<GrowthMetrics | null>(null);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,15 +93,19 @@ export default function AcquisitionPage() {
     const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
     
     try {
-      const [contentRes, funnelRes, logsRes] = await Promise.all([
+      const [contentRes, funnelRes, growthRes, referralRes, logsRes] = await Promise.all([
         fetch("/api/content?stats=true", { headers }),
         fetch("/api/funnel", { headers }),
+        fetch("/api/growth", { headers }),
+        fetch("/api/referral-tracking", { headers }),
         fetch("/api/agent/logs", { headers }),
       ]);
       
       if (contentRes.ok && funnelRes.ok) {
         setContentStats(await contentRes.json());
         setFunnelStats(await funnelRes.json());
+        if (growthRes.ok) setGrowthMetrics(await growthRes.json());
+        if (referralRes.ok) setReferralStats(await referralRes.json());
         if (logsRes.ok) setLogs(await logsRes.json());
         setAuthed(true);
       } else {
@@ -91,12 +122,16 @@ export default function AcquisitionPage() {
     const interval = setInterval(async () => {
       const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
       try {
-        const [contentRes, funnelRes] = await Promise.all([
+        const [contentRes, funnelRes, growthRes, referralRes] = await Promise.all([
           fetch("/api/content?stats=true", { headers }),
           fetch("/api/funnel", { headers }),
+          fetch("/api/growth", { headers }),
+          fetch("/api/referral-tracking", { headers }),
         ]);
         if (contentRes.ok) setContentStats(await contentRes.json());
         if (funnelRes.ok) setFunnelStats(await funnelRes.json());
+        if (growthRes.ok) setGrowthMetrics(await growthRes.json());
+        if (referralRes.ok) setReferralStats(await referralRes.json());
       } catch {}
     }, 30000);
     return () => clearInterval(interval);
@@ -167,6 +202,118 @@ export default function AcquisitionPage() {
           <div className={styles.cardLabel}>Taxa de Conversão</div>
         </div>
       </div>
+
+      {/* Métricas de Crescimento Viral */}
+      {growthMetrics && (
+        <div className={styles.grid}>
+          <div className={`${styles.cardBig} ${styles.cardGreen}`}>
+            <div className={styles.cardIcon}>👥</div>
+            <div className={styles.cardValue}>{growthMetrics.totalMembers}</div>
+            <div className={styles.cardLabel}>Total Membros</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardGold}`}>
+            <div className={styles.cardIcon}>📈</div>
+            <div className={styles.cardValue}>{growthMetrics.viralCoefficient}</div>
+            <div className={styles.cardLabel}>Coeficiente Viral</div>
+          </div>
+          <div className={styles.cardBig}>
+            <div className={styles.cardIcon}>🔗</div>
+            <div className={styles.cardValue}>{referralStats?.totalReferrals ?? 0}</div>
+            <div className={styles.cardLabel}>Indicações Totais</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardPurple}`}>
+            <div className={styles.cardIcon}>✅</div>
+            <div className={styles.cardValue}>{referralStats?.convertedReferrals ?? 0}</div>
+            <div className={styles.cardLabel}>Indicações Convertidas</div>
+          </div>
+          <div className={`${styles.cardBig} ${styles.cardYellow}`}>
+            <div className={styles.cardIcon}>📊</div>
+            <div className={styles.cardValue}>{referralStats?.conversionRate ?? 0}%</div>
+            <div className={styles.cardLabel}>Taxa Conversão Indicação</div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Indicadores */}
+      {referralStats && referralStats.topReferrers.length > 0 && (
+        <div className={styles.section}>
+          <h2>🏆 Top Indicadores</h2>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nome</th>
+                  <th>Cidade</th>
+                  <th>Indicações</th>
+                  <th>Conversões</th>
+                  <th>Taxa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referralStats.topReferrers.map((r, i) => (
+                  <tr key={r.referrer_uid}>
+                    <td>{i + 1}</td>
+                    <td style={{ fontWeight: 700 }}>{r.name}</td>
+                    <td>{r.city}, {r.state}</td>
+                    <td>{r.total_referrals}</td>
+                    <td>{r.conversions}</td>
+                    <td>{r.total_referrals > 0 ? Math.round((r.conversions / r.total_referrals) * 100) : 0}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Indicações por Plataforma */}
+      {referralStats && referralStats.byPlatform.length > 0 && (
+        <div className={styles.section}>
+          <h2>📱 Indicações por Plataforma</h2>
+          <div className={styles.sourceGrid}>
+            {referralStats.byPlatform.map(p => (
+              <div key={p.platform} className={styles.sourceCard}>
+                <div className={styles.sourceValue}>{p.total}</div>
+                <div className={styles.sourceLabel}>{p.platform}</div>
+                <div className={styles.sourceConversions}>{p.converted} conversões</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Crescimento por Dia */}
+      {growthMetrics && growthMetrics.last7Days.length > 0 && (
+        <div className={styles.section}>
+          <h2>📈 Crescimento (Últimos 7 Dias)</h2>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Novos Membros</th>
+                  <th>Indicações</th>
+                  <th>Convertidos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {growthMetrics.last7Days.map(day => {
+                  const refDay = referralStats?.byDay.find(r => r.day === day.day);
+                  return (
+                    <tr key={day.day}>
+                      <td>{new Date(day.day).toLocaleDateString("pt-BR")}</td>
+                      <td style={{ fontWeight: 700, color: "#4ade80" }}>{day.count}</td>
+                      <td>{refDay?.total ?? 0}</td>
+                      <td>{refDay?.converted ?? 0}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Melhores Colocados */}
       <div className={styles.section}>
