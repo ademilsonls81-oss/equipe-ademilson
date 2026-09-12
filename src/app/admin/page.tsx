@@ -9,6 +9,12 @@ type Reg = {
   referrals_count: number; utm_source: string | null; created_at: string;
 };
 type Stats = { total: number; by_state: any[]; by_how_found: any[]; recent_week: number };
+type AutomationData = {
+  mode: string;
+  queue: { total: number; published: number; scheduled: number; draft: number; failed: number; publishedToday: number };
+  platforms: { platform: string; enabled: boolean; today_usage: number; daily_limit: number }[];
+  last_cron_run: string | null;
+};
 
 export default function AdminPage() {
   const [user, setUser] = useState("");
@@ -16,6 +22,7 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
   const [authErr, setAuthErr] = useState(false);
   const [data, setData] = useState<{ registrations: Reg[]; stats: Stats } | null>(null);
+  const [automation, setAutomation] = useState<AutomationData | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -39,8 +46,13 @@ export default function AdminPage() {
   const fetchData = useCallback(async () => {
     if (!authed) return;
     setLoading(true);
-    const res = await fetch(`/api/admin?page=${page}`, { headers: { Authorization: getAuth() } });
-    if (res.ok) setData(await res.json());
+    const auth = getAuth();
+    const [adminRes, autoRes] = await Promise.all([
+      fetch(`/api/admin?page=${page}`, { headers: { Authorization: auth } }),
+      fetch("/api/content-engine?automation=true", { headers: { Authorization: auth } }),
+    ]);
+    if (adminRes.ok) setData(await adminRes.json());
+    if (autoRes.ok) setAutomation(await autoRes.json());
     setLoading(false);
   }, [authed, page]);
 
@@ -126,6 +138,48 @@ export default function AdminPage() {
             <div className={styles.statLabel}>Total de indicações</div>
           </div>
         </div>
+
+        {/* Automation Status */}
+        {automation && (
+          <div className={styles.automationCard}>
+            <div className={styles.automationHeader}>
+              <h3>🤖 Automação</h3>
+              <a href="/admin/acquisition/content-engine" className={styles.automationLink}>Ver Content Engine →</a>
+            </div>
+            <div className={styles.automationGrid}>
+              <div className={styles.automationStat}>
+                <span className={styles.automationLabel}>Modo</span>
+                <span className={`${styles.automationBadge} ${automation.mode === "autonomous" ? styles.badgeAutonomous : automation.mode === "paused" ? styles.badgePaused : styles.badgeTest}`}>
+                  {automation.mode.toUpperCase()}
+                </span>
+              </div>
+              <div className={styles.automationStat}>
+                <span className={styles.automationLabel}>Na Fila</span>
+                <span className={styles.automationValue}>{automation.queue.total || 0}</span>
+              </div>
+              <div className={styles.automationStat}>
+                <span className={styles.automationLabel}>Publicados Hoje</span>
+                <span className={styles.automationValue}>{automation.queue.publishedToday || 0}</span>
+              </div>
+              <div className={styles.automationStat}>
+                <span className={styles.automationLabel}>Agendados</span>
+                <span className={styles.automationValue}>{automation.queue.scheduled || 0}</span>
+              </div>
+              <div className={styles.automationStat}>
+                <span className={styles.automationLabel}>Falhas</span>
+                <span className={`${styles.automationValue} ${automation.queue.failed > 0 ? styles.errorCount : ""}`}>
+                  {automation.queue.failed || 0}
+                </span>
+              </div>
+              <div className={styles.automationStat}>
+                <span className={styles.automationLabel}>Último Cron</span>
+                <span className={styles.automationSmall}>
+                  {automation.last_cron_run ? new Date(automation.last_cron_run).toLocaleString("pt-BR") : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mini charts */}
         <div className={styles.chartsGrid}>

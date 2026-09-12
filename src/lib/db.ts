@@ -294,6 +294,49 @@ function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_cc_platform ON campaign_contents(platform);
     CREATE INDEX IF NOT EXISTS idx_cc_status ON campaign_contents(status);
     CREATE INDEX IF NOT EXISTS idx_cc_content ON campaign_contents(content_index);
+    CREATE TABLE IF NOT EXISTS publication_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id TEXT NOT NULL,
+      content_id TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      media_url TEXT,
+      destination_url TEXT,
+      utm_source TEXT,
+      utm_medium TEXT DEFAULT 'organic',
+      utm_campaign TEXT,
+      utm_content TEXT,
+      scheduled_at DATETIME NOT NULL,
+      status TEXT DEFAULT 'draft',
+      published_at DATETIME,
+      external_post_id TEXT,
+      error_message TEXT,
+      retry_count INTEGER DEFAULT 0,
+      max_retries INTEGER DEFAULT 3,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_pq_status ON publication_queue(status);
+    CREATE INDEX IF NOT EXISTS idx_pq_platform ON publication_queue(platform);
+    CREATE INDEX IF NOT EXISTS idx_pq_scheduled ON publication_queue(scheduled_at);
+    CREATE INDEX IF NOT EXISTS idx_pq_campaign ON publication_queue(campaign_id);
+    CREATE INDEX IF NOT EXISTS idx_pq_content ON publication_queue(content_id);
+    CREATE TABLE IF NOT EXISTS platform_config (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT UNIQUE NOT NULL,
+      api_configured INTEGER DEFAULT 0,
+      api_token TEXT,
+      api_secret TEXT,
+      api_key TEXT,
+      daily_limit INTEGER DEFAULT 3,
+      enabled INTEGER DEFAULT 1,
+      last_publish DATETIME,
+      total_published INTEGER DEFAULT 0,
+      total_errors INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   return _db;
 }
@@ -1719,10 +1762,14 @@ export function getLearningInsights() {
 }
 
 export function getAgentMode() {
+  const paused = getAgentConfig("acquisition_paused") === "true";
+  const autonomous = getAgentConfig("agent_mode") === "autonomous";
+  const mode = paused ? "paused" : autonomous ? "autonomous" : "test";
   return {
-    testMode: getAgentConfig("agent_mode") !== "autonomous",
-    autonomousMode: getAgentConfig("agent_mode") === "autonomous",
-    paused: getAgentConfig("acquisition_paused") === "true",
+    mode,
+    testMode: !autonomous && !paused,
+    autonomousMode: autonomous,
+    paused,
     minDataThreshold: parseInt(getAgentConfig("min_data_threshold") || "5"),
   };
 }
@@ -2132,6 +2179,283 @@ export function seedPrimeiraCampanha() {
   });
 
   return { campaign_id: campaignId, created };
+}
+
+export interface PublicationItem {
+  id: number;
+  campaign_id: string;
+  content_id: string;
+  platform: string;
+  title: string;
+  content: string;
+  media_url: string | null;
+  destination_url: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  scheduled_at: string;
+  status: string;
+  published_at: string | null;
+  external_post_id: string | null;
+  error_message: string | null;
+  retry_count: number;
+  max_retries: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function addToPublicationQueue(data: {
+  campaign_id: string;
+  content_id: string;
+  platform: string;
+  title: string;
+  content: string;
+  media_url?: string;
+  destination_url?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_content?: string;
+  scheduled_at: string;
+  status?: string;
+}): PublicationItem {
+  const db = getDb();
+  db.prepare(`INSERT INTO publication_queue (campaign_id, content_id, platform, title, content, media_url, destination_url, utm_source, utm_medium, utm_campaign, utm_content, scheduled_at, status)
+    VALUES (@campaign_id, @content_id, @platform, @title, @content, @media_url, @destination_url, @utm_source, @utm_medium, @utm_campaign, @utm_content, @scheduled_at, @status)`).run({
+    ...data,
+    media_url: data.media_url || null,
+    destination_url: data.destination_url || null,
+    utm_source: data.utm_source || data.platform,
+    utm_medium: data.utm_medium || "organic",
+    utm_campaign: data.utm_campaign || "primeiro-100-membros",
+    utm_content: data.utm_content || null,
+    status: data.status || "draft",
+  });
+  return db.prepare("SELECT * FROM publication_queue WHERE id = last_insert_rowid()").get() as PublicationItem;
+}
+
+export function getPublicationQueue(filters?: {
+  status?: string;
+  platform?: string;
+  campaign_id?: string;
+  limit?: number;
+  offset?: number;
+}): PublicationItem[] {
+  const db = getDb();
+  let query = "SELECT * FROM publication_queue WHERE 1=1";
+  const params: any[] = [];
+  if (filters?.status) { query += " AND status = ?"; params.push(filters.status); }
+  if (filters?.platform) { query += " AND platform = ?"; params.push(filters.platform); }
+  if (filters?.campaign_id) { query += " AND campaign_id = ?"; params.push(filters.campaign_id); }
+  query += " ORDER BY scheduled_at ASC";
+  if (filters?.limit) { query += " LIMIT ?"; params.push(filters.limit); }
+  if (filters?.offset) { query += " OFFSET ?"; params.push(filters.offset); }
+  return db.prepare(query).all(...params) as PublicationItem[];
+}
+
+export function getPublicationQueueStats() {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+  return {
+    total: (db.prepare("SELECT COUNT(*) as c FROM publication_queue").get() as any).c,
+    draft: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'draft'").get() as any).c,
+    approved: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'approved'").get() as any).c,
+    scheduled: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'scheduled'").get() as any).c,
+    publishing: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'publishing'").get() as any).c,
+    published: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'published'").get() as any).c,
+    failed: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'failed'").get() as any).c,
+    paused: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'paused'").get() as any).c,
+    publishedToday: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'published' AND date(published_at) = ?").get(today) as any).c,
+    scheduledUpcoming: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'scheduled' AND scheduled_at > datetime('now')").get() as any).c,
+    retryPending: (db.prepare("SELECT COUNT(*) as c FROM publication_queue WHERE status = 'failed' AND retry_count < max_retries").get() as any).c,
+    byPlatform: db.prepare(`
+      SELECT platform, 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled
+      FROM publication_queue GROUP BY platform ORDER BY total DESC
+    `).all() as { platform: string; total: number; published: number; failed: number; scheduled: number }[],
+  };
+}
+
+export function updatePublicationQueue(id: number, data: Partial<{
+  status: string;
+  published_at: string;
+  external_post_id: string;
+  error_message: string;
+  retry_count: number;
+  scheduled_at: string;
+}>) {
+  const db = getDb();
+  const allowed = ["status", "published_at", "external_post_id", "error_message", "retry_count", "scheduled_at"];
+  const updates: string[] = [];
+  const values: any[] = [];
+  Object.entries(data).forEach(([key, value]) => {
+    if (allowed.includes(key)) { updates.push(`${key} = ?`); values.push(value); }
+  });
+  if (updates.length === 0) return;
+  updates.push("updated_at = CURRENT_TIMESTAMP");
+  values.push(id);
+  db.prepare(`UPDATE publication_queue SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+}
+
+export function getPendingPublications(): PublicationItem[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM publication_queue 
+    WHERE status IN ('approved', 'scheduled') 
+    AND scheduled_at <= datetime('now')
+    ORDER BY scheduled_at ASC
+  `).all() as PublicationItem[];
+}
+
+export function getFailedRetries(): PublicationItem[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM publication_queue 
+    WHERE status = 'failed' 
+    AND retry_count < max_retries
+    AND (next_retry IS NULL OR next_retry <= datetime('now'))
+    ORDER BY retry_count ASC, scheduled_at ASC
+  `).all() as PublicationItem[];
+}
+
+export function markAsPublished(id: number, externalPostId: string) {
+  updatePublicationQueue(id, {
+    status: "published",
+    published_at: new Date().toISOString(),
+    external_post_id: externalPostId,
+    error_message: undefined,
+  });
+}
+
+export function markAsFailed(id: number, error: string) {
+  const db = getDb();
+  const item = db.prepare("SELECT retry_count, max_retries FROM publication_queue WHERE id = ?").get(id) as any;
+  if (!item) return;
+  const newRetryCount = item.retry_count + 1;
+  const nextRetry = newRetryCount < item.max_retries
+    ? new Date(Date.now() + Math.pow(2, newRetryCount) * 60 * 60 * 1000).toISOString()
+    : null;
+  updatePublicationQueue(id, {
+    status: newRetryCount >= item.max_retries ? "failed" : "scheduled",
+    error_message: error,
+    retry_count: newRetryCount,
+    scheduled_at: nextRetry || undefined,
+  });
+}
+
+export function isDuplicatePublication(contentId: string, platform: string): boolean {
+  const db = getDb();
+  const existing = db.prepare(
+    "SELECT COUNT(*) as c FROM publication_queue WHERE content_id = ? AND platform = ? AND status = 'published'"
+  ).get(contentId, platform) as any;
+  return existing.c > 0;
+}
+
+export function getPlatformConfig(platform: string) {
+  const db = getDb();
+  return db.prepare("SELECT * FROM platform_config WHERE platform = ?").get(platform) as any;
+}
+
+export function getAllPlatformConfigs() {
+  const db = getDb();
+  return db.prepare("SELECT * FROM platform_config ORDER BY platform ASC").all() as any[];
+}
+
+export function upsertPlatformConfig(platform: string, data: Partial<{
+  api_configured: number;
+  api_token: string;
+  api_secret: string;
+  api_key: string;
+  daily_limit: number;
+  enabled: number;
+}>) {
+  const db = getDb();
+  const existing = db.prepare("SELECT id FROM platform_config WHERE platform = ?").get(platform) as any;
+  if (existing) {
+    const updates: string[] = [];
+    const values: any[] = [];
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined) { updates.push(`${key} = ?`); values.push(value); }
+    });
+    if (updates.length === 0) return;
+    updates.push("updated_at = CURRENT_TIMESTAMP");
+    values.push(platform);
+    db.prepare(`UPDATE platform_config SET ${updates.join(", ")} WHERE platform = ?`).run(...values);
+  } else {
+    db.prepare(`INSERT INTO platform_config (platform, api_configured, api_token, api_secret, api_key, daily_limit, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+      platform,
+      data.api_configured || 0,
+      data.api_token || null,
+      data.api_secret || null,
+      data.api_key || null,
+      data.daily_limit || 3,
+      data.enabled !== undefined ? data.enabled : 1,
+    );
+  }
+}
+
+export function seedPlatformConfigs() {
+  const platforms = [
+    { platform: "youtube", daily_limit: 2 },
+    { platform: "tiktok", daily_limit: 3 },
+    { platform: "instagram", daily_limit: 3 },
+    { platform: "facebook", daily_limit: 3 },
+    { platform: "pinterest", daily_limit: 5 },
+    { platform: "reddit", daily_limit: 2 },
+  ];
+  for (const p of platforms) {
+    const existing = getPlatformConfig(p.platform);
+    if (!existing) {
+      upsertPlatformConfig(p.platform, { daily_limit: p.daily_limit, enabled: 1 });
+    }
+  }
+}
+
+export function checkPlatformDailyLimit(platform: string): { allowed: boolean; current: number; limit: number } {
+  const db = getDb();
+  const today = new Date().toISOString().split("T")[0];
+  const config = getPlatformConfig(platform);
+  const limit = config?.daily_limit || 3;
+  const current = (db.prepare(
+    "SELECT COUNT(*) as c FROM publication_queue WHERE platform = ? AND status = 'published' AND date(published_at) = ?"
+  ).get(platform, today) as any).c;
+  return { allowed: current < limit, current, limit };
+}
+
+export function getAutomationStatus() {
+  const db = getDb();
+  const mode = getAgentMode();
+  const queueStats = getPublicationQueueStats();
+  const platforms = getAllPlatformConfigs();
+  
+  const platformStatus = platforms.map((p: any) => ({
+    platform: p.platform,
+    api_configured: p.api_configured === 1,
+    enabled: p.enabled === 1,
+    daily_limit: p.daily_limit,
+    total_published: p.total_published || 0,
+    total_errors: p.total_errors || 0,
+    last_publish: p.last_publish,
+    today_usage: (db.prepare(
+      "SELECT COUNT(*) as c FROM publication_queue WHERE platform = ? AND status = 'published' AND date(published_at) = date('now')"
+    ).get(p.platform) as any).c,
+  }));
+
+  return {
+    mode: mode.mode,
+    test_mode: mode.mode === "test",
+    autonomous_mode: mode.mode === "autonomous",
+    paused_mode: mode.mode === "paused",
+    queue: queueStats,
+    platforms: platformStatus,
+    last_cron_run: getAgentConfig("cron_last_run"),
+    next_cron_run: getAgentConfig("cron_next_run"),
+  };
 }
 
 export default getDb;

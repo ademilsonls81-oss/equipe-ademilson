@@ -25,6 +25,38 @@ type Topic = { topic_id: string; title: string; description: string; category: s
 type Draft = { draft_id: string; topic_id: string; title: string; body: string; platform: string; content_type: string; cta: string; utm_source: string; utm_medium: string; utm_campaign: string; utm_content: string; status: string; sessions: number; registrations: number; whatsapp_clicks: number; referrals: number; score: number; created_at: string };
 type AgentMode = { testMode: boolean; autonomousMode: boolean; paused: boolean; minDataThreshold: number };
 type LearningInsights = { insights: any[]; score: any; hasEnoughData: boolean; minDataThreshold: number };
+type AutomationStatus = {
+  mode: string;
+  test_mode: boolean;
+  autonomous_mode: boolean;
+  paused_mode: boolean;
+  queue: {
+    total: number;
+    draft: number;
+    approved: number;
+    scheduled: number;
+    publishing: number;
+    published: number;
+    failed: number;
+    paused: number;
+    publishedToday: number;
+    scheduledUpcoming: number;
+    retryPending: number;
+    byPlatform: { platform: string; total: number; published: number; failed: number; scheduled: number }[];
+  };
+  platforms: {
+    platform: string;
+    api_configured: boolean;
+    enabled: boolean;
+    daily_limit: number;
+    total_published: number;
+    total_errors: number;
+    last_publish: string | null;
+    today_usage: number;
+  }[];
+  last_cron_run: string | null;
+  next_cron_run: string | null;
+};
 
 const PLATFORMS = ["google", "youtube", "tiktok", "instagram", "facebook", "pinterest", "reddit"];
 
@@ -36,9 +68,10 @@ export default function ContentEnginePage() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [agentMode, setAgentMode] = useState<AgentMode | null>(null);
   const [learning, setLearning] = useState<LearningInsights | null>(null);
+  const [automation, setAutomation] = useState<AutomationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "learning" | "topics" | "drafts" | "schedule">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "learning" | "topics" | "drafts" | "schedule" | "automation">("dashboard");
 
   async function login(e: React.FormEvent) {
     e.preventDefault();
@@ -46,12 +79,13 @@ export default function ContentEnginePage() {
     setError(false);
     const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
     try {
-      const [dashRes, topicsRes, draftsRes, modeRes, learnRes] = await Promise.all([
+      const [dashRes, topicsRes, draftsRes, modeRes, learnRes, autoRes] = await Promise.all([
         fetch("/api/content-engine?dashboard=true", { headers }),
         fetch("/api/content-engine?topics=true", { headers }),
         fetch("/api/content-engine?drafts=true", { headers }),
         fetch("/api/content-engine?mode=true", { headers }),
         fetch("/api/content-engine?learning=true", { headers }),
+        fetch("/api/content-engine?automation=true", { headers }),
       ]);
       if (dashRes.ok && topicsRes.ok && draftsRes.ok) {
         setDashboard(await dashRes.json());
@@ -59,6 +93,7 @@ export default function ContentEnginePage() {
         setDrafts(await draftsRes.json());
         if (modeRes.ok) setAgentMode(await modeRes.json());
         if (learnRes.ok) setLearning(await learnRes.json());
+        if (autoRes.ok) setAutomation(await autoRes.json());
         setAuthed(true);
       } else { setError(true); }
     } catch { setError(true); }
@@ -67,18 +102,20 @@ export default function ContentEnginePage() {
 
   async function refresh() {
     const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
-    const [dashRes, topicsRes, draftsRes, modeRes, learnRes] = await Promise.all([
+    const [dashRes, topicsRes, draftsRes, modeRes, learnRes, autoRes] = await Promise.all([
       fetch("/api/content-engine?dashboard=true", { headers }),
       fetch("/api/content-engine?topics=true", { headers }),
       fetch("/api/content-engine?drafts=true", { headers }),
       fetch("/api/content-engine?mode=true", { headers }),
       fetch("/api/content-engine?learning=true", { headers }),
+      fetch("/api/content-engine?automation=true", { headers }),
     ]);
     if (dashRes.ok) setDashboard(await dashRes.json());
     if (topicsRes.ok) setTopics(await topicsRes.json());
     if (draftsRes.ok) setDrafts(await draftsRes.json());
     if (modeRes.ok) setAgentMode(await modeRes.json());
     if (learnRes.ok) setLearning(await learnRes.json());
+    if (autoRes.ok) setAutomation(await autoRes.json());
   }
 
   async function setMode(mode: "test" | "autonomous" | "paused") {
@@ -175,6 +212,7 @@ export default function ContentEnginePage() {
         <button className={`${styles.tab} ${activeTab === "topics" ? styles.tabActive : ""}`} onClick={() => setActiveTab("topics")}>💡 Temas</button>
         <button className={`${styles.tab} ${activeTab === "drafts" ? styles.tabActive : ""}`} onClick={() => setActiveTab("drafts")}>📝 Rascunhos</button>
         <button className={`${styles.tab} ${activeTab === "schedule" ? styles.tabActive : ""}`} onClick={() => setActiveTab("schedule")}>📅 Agenda</button>
+        <button className={`${styles.tab} ${activeTab === "automation" ? styles.tabActive : ""}`} onClick={() => setActiveTab("automation")}>🤖 Automação</button>
       </nav>
 
       {activeTab === "dashboard" && dashboard && (
@@ -336,6 +374,130 @@ export default function ContentEnginePage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === "automation" && automation && (
+        <div className={styles.content}>
+          <div className={styles.section}>
+            <h2>🤖 STATUS DA AUTOMAÇÃO</h2>
+            <div className={styles.grid5}>
+              <div className={`${styles.cardBig} ${automation.autonomous_mode ? styles.cardGreen : automation.paused_mode ? "" : ""}`}>
+                <div className={styles.cardIcon}>{automation.autonomous_mode ? "🟢" : automation.paused_mode ? "🔴" : "🟡"}</div>
+                <div className={styles.cardValue} style={{ color: automation.autonomous_mode ? "#4ade80" : automation.paused_mode ? "#ef4444" : "#60a5fa" }}>
+                  {automation.mode.toUpperCase()}
+                </div>
+                <div className={styles.cardLabel}>Modo Atual</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>📋</div>
+                <div className={styles.cardValue}>{automation.queue.total || 0}</div>
+                <div className={styles.cardLabel}>Itens na Fila</div>
+              </div>
+              <div className={`${styles.cardBig} ${styles.cardGreen}`}>
+                <div className={styles.cardIcon}>✅</div>
+                <div className={styles.cardValue}>{automation.queue.published || 0}</div>
+                <div className={styles.cardLabel}>Publicados</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>📅</div>
+                <div className={styles.cardValue}>{automation.queue.scheduled || 0}</div>
+                <div className={styles.cardLabel}>Agendados</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>⏳</div>
+                <div className={styles.cardValue}>{automation.queue.draft || 0}</div>
+                <div className={styles.cardLabel}>Rascunhos</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <h2>📊 FILA POR STATUS</h2>
+            <div className={styles.statusGrid}>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.draft || 0}</div><div className={styles.statusLabel}>Draft</div></div>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.approved || 0}</div><div className={styles.statusLabel}>Aprovado</div></div>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.scheduled || 0}</div><div className={styles.statusLabel}>Agendado</div></div>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.publishing || 0}</div><div className={styles.statusLabel}>Publicando</div></div>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.published || 0}</div><div className={styles.statusLabel}>Publicado</div></div>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.failed || 0}</div><div className={styles.statusLabel}>Falhou</div></div>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.paused || 0}</div><div className={styles.statusLabel}>Pausado</div></div>
+              <div className={styles.statusCard}><div className={styles.statusCount}>{automation.queue.publishedToday || 0}</div><div className={styles.statusLabel}>Hoje</div></div>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <h2>📱 PLATAFORMAS</h2>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr><th>Plataforma</th><th>API</th><th>Status</th><th>Limite/Dia</th><th>Usados Hoje</th><th>Total Pub.</th><th>Erros</th><th>Última Pub.</th></tr>
+                </thead>
+                <tbody>
+                  {automation.platforms.map((p) => (
+                    <tr key={p.platform}>
+                      <td style={{ fontWeight: 700 }}>{p.platform}</td>
+                      <td>{p.api_configured ? "✅ Configurada" : "❌ Não configurada"}</td>
+                      <td>
+                        <span className={`${styles.badge} ${p.enabled ? styles.badgeaprovado : styles.badgefraco}`}>
+                          {p.enabled ? "ATIVADA" : "DESATIVADA"}
+                        </span>
+                      </td>
+                      <td>{p.daily_limit}</td>
+                      <td>{p.today_usage}/{p.daily_limit}</td>
+                      <td>{p.total_published}</td>
+                      <td style={{ color: p.total_errors > 0 ? "#ef4444" : undefined }}>{p.total_errors}</td>
+                      <td>{p.last_publish ? new Date(p.last_publish).toLocaleString("pt-BR") : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <h2>⏰ CRON JOBS</h2>
+            <div className={styles.grid5} style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>🔄</div>
+                <div className={styles.cardValue} style={{ fontSize: "16px" }}>
+                  {automation.last_cron_run ? new Date(automation.last_cron_run).toLocaleString("pt-BR") : "Nunca executado"}
+                </div>
+                <div className={styles.cardLabel}>Última Execução</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>⏭️</div>
+                <div className={styles.cardValue} style={{ fontSize: "16px" }}>
+                  {automation.next_cron_run ? new Date(automation.next_cron_run).toLocaleString("pt-BR") : "A cada 15 min"}
+                </div>
+                <div className={styles.cardLabel}>Próxima Execução</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <h2>📊 FILA POR PLATAFORMA</h2>
+            {automation.queue.byPlatform && automation.queue.byPlatform.length > 0 ? (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Plataforma</th><th>Total</th><th>Publicados</th><th>Falhou</th><th>Agendados</th></tr></thead>
+                  <tbody>
+                    {automation.queue.byPlatform.map((p) => (
+                      <tr key={p.platform}>
+                        <td style={{ fontWeight: 700 }}>{p.platform}</td>
+                        <td>{p.total}</td>
+                        <td style={{ color: "#4ade80" }}>{p.published}</td>
+                        <td style={{ color: p.failed > 0 ? "#ef4444" : undefined }}>{p.failed}</td>
+                        <td>{p.scheduled}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className={styles.emptyState}><p>Nenhum item na fila por plataforma.</p></div>
+            )}
+          </div>
         </div>
       )}
     </div>

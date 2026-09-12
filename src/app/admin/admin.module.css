@@ -61,5 +61,22 @@
 .pagination { display:flex; align-items:center; gap:16px; padding:16px 20px; border-top:1px solid var(--border); }
 .pagination span { font-size:14px; color:var(--text-muted); flex:1; text-align:center; }
 
-@media (max-width:900px) { .statsGrid { grid-template-columns:1fr 1fr; } .chartsGrid { grid-template-columns:1fr; } }
+/* Automation Status */
+.automationCard { background:var(--glass); border:1px solid var(--glass-border); border-radius:var(--radius); padding:20px 24px; }
+.automationHeader { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.automationHeader h3 { font-size:16px; color:var(--white); margin:0; }
+.automationLink { font-size:13px; color:var(--gold); text-decoration:none; font-weight:600; }
+.automationLink:hover { text-decoration:underline; }
+.automationGrid { display:flex; flex-wrap:wrap; gap:20px; align-items:center; }
+.automationStat { display:flex; flex-direction:column; gap:4px; }
+.automationLabel { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; }
+.automationValue { font-size:20px; font-weight:800; font-family:"Outfit",sans-serif; color:var(--white); }
+.automationSmall { font-size:12px; color:var(--text-muted); }
+.automationBadge { display:inline-block; padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+.badgeTest { background:rgba(96,165,250,0.15); color:#60a5fa; }
+.badgeAutonomous { background:rgba(74,222,128,0.15); color:#4ade80; }
+.badgePaused { background:rgba(239,68,68,0.15); color:#ef4444; }
+.errorCount { color:#ef4444; }
+
+@media (max-width:900px) { .statsGrid { grid-template-columns:1fr 1fr; } .chartsGrid { grid-template-columns:1fr; } .automationGrid { flex-direction:column; align-items:flex-start; } }
 @media (max-width:600px) { .statsGrid { grid-template-columns:1fr 1fr; } .header { flex-direction:column; align-items:flex-start; gap:12px; } }

@@ -8,6 +8,9 @@ import {
   createAgentLog, getAgentConfig, setAgentConfig,
   calculateWeightedScore, getLearningInsights, getAgentMode, setAgentMode, setMinDataThreshold,
   getCampaignContents, getCampaignStats, updateCampaignContent, seedPrimeiraCampanha,
+  getPublicationQueue, getPublicationQueueStats, addToPublicationQueue, updatePublicationQueue,
+  getAutomationStatus, getAllPlatformConfigs, upsertPlatformConfig, seedPlatformConfigs,
+  getPlatformConfig,
 } from "@/lib/db";
 
 export async function GET(request: Request) {
@@ -63,6 +66,24 @@ export async function GET(request: Request) {
       const contents = getCampaignContents(campaignId);
       const stats = getCampaignStats(campaignId);
       return NextResponse.json({ contents, stats });
+    }
+    if (url.searchParams.get("queue") === "true") {
+      const status = url.searchParams.get("status") || undefined;
+      const platform = url.searchParams.get("platform") || undefined;
+      const campaignId = url.searchParams.get("campaign_id") || undefined;
+      const limit = parseInt(url.searchParams.get("limit") || "50");
+      const offset = parseInt(url.searchParams.get("offset") || "0");
+      const items = getPublicationQueue({ status, platform, campaign_id: campaignId, limit, offset });
+      const stats = getPublicationQueueStats();
+      return NextResponse.json({ items, stats });
+    }
+    if (url.searchParams.get("automation") === "true") {
+      return NextResponse.json(getAutomationStatus());
+    }
+    if (url.searchParams.get("platforms") === "true") {
+      seedPlatformConfigs();
+      const configs = getAllPlatformConfigs();
+      return NextResponse.json(configs);
     }
 
     return NextResponse.json(getContentEngineDashboard());
@@ -212,6 +233,94 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "campaign_id, content_index, and platform required" }, { status: 400 });
       }
       updateCampaignContent(campaign_id, content_index, platform, data);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "add_to_queue") {
+      const { campaign_id, content_id, platform, title, content, media_url, destination_url, utm_source, utm_medium, utm_campaign, utm_content, scheduled_at } = body;
+      if (!campaign_id || !content_id || !platform || !title || !content || !scheduled_at) {
+        return NextResponse.json({ error: "campaign_id, content_id, platform, title, content, and scheduled_at required" }, { status: 400 });
+      }
+      const item = addToPublicationQueue({
+        campaign_id, content_id, platform, title, content,
+        media_url, destination_url, utm_source, utm_medium, utm_campaign, utm_content,
+        scheduled_at, status: "draft",
+      });
+      createAgentLog({ agent_type: "content_engine", action: "add_to_queue", details: `Content "${title}" added to queue for ${platform}`, status: "success" });
+      return NextResponse.json({ ok: true, item });
+    }
+
+    if (action === "approve_queue_item") {
+      const { item_id } = body;
+      if (!item_id) return NextResponse.json({ error: "item_id required" }, { status: 400 });
+      updatePublicationQueue(item_id, { status: "approved" });
+      createAgentLog({ agent_type: "content_engine", action: "approve_queue_item", details: `Queue item ${item_id} approved`, status: "success" });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "schedule_queue_item") {
+      const { item_id, scheduled_at } = body;
+      if (!item_id || !scheduled_at) return NextResponse.json({ error: "item_id and scheduled_at required" }, { status: 400 });
+      updatePublicationQueue(item_id, { status: "scheduled", scheduled_at });
+      createAgentLog({ agent_type: "content_engine", action: "schedule_queue_item", details: `Queue item ${item_id} scheduled for ${scheduled_at}`, status: "success" });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "cancel_queue_item") {
+      const { item_id } = body;
+      if (!item_id) return NextResponse.json({ error: "item_id required" }, { status: 400 });
+      updatePublicationQueue(item_id, { status: "paused" });
+      createAgentLog({ agent_type: "content_engine", action: "cancel_queue_item", details: `Queue item ${item_id} cancelled`, status: "success" });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "delete_queue_item") {
+      const { item_id } = body;
+      if (!item_id) return NextResponse.json({ error: "item_id required" }, { status: 400 });
+      const db = (await import("@/lib/db")).default();
+      db.prepare("DELETE FROM publication_queue WHERE id = ?").run(item_id);
+      createAgentLog({ agent_type: "content_engine", action: "delete_queue_item", details: `Queue item ${item_id} deleted`, status: "success" });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "bulk_add_to_queue") {
+      const { campaign_id, items: queueItems } = body;
+      if (!campaign_id || !queueItems || !Array.isArray(queueItems)) {
+        return NextResponse.json({ error: "campaign_id and items array required" }, { status: 400 });
+      }
+      let added = 0;
+      for (const item of queueItems) {
+        addToPublicationQueue({
+          campaign_id,
+          content_id: item.content_id || `${campaign_id}-${item.platform}-${item.title?.substring(0, 20)}`,
+          platform: item.platform,
+          title: item.title,
+          content: item.content,
+          media_url: item.media_url,
+          destination_url: item.destination_url,
+          utm_source: item.utm_source,
+          utm_medium: item.utm_medium,
+          utm_campaign: item.utm_campaign,
+          utm_content: item.utm_content,
+          scheduled_at: item.scheduled_at || new Date().toISOString(),
+          status: item.status || "draft",
+        });
+        added++;
+      }
+      createAgentLog({ agent_type: "content_engine", action: "bulk_add_to_queue", details: `${added} items added to queue for campaign ${campaign_id}`, status: "success" });
+      return NextResponse.json({ ok: true, added });
+    }
+
+    if (action === "update_platform_config") {
+      const { platform, api_configured, api_token, api_secret, api_key, daily_limit, enabled } = body;
+      if (!platform) return NextResponse.json({ error: "platform required" }, { status: 400 });
+      upsertPlatformConfig(platform, { api_configured, api_token, api_secret, api_key, daily_limit, enabled });
+      createAgentLog({ agent_type: "content_engine", action: "update_platform_config", details: `Platform ${platform} config updated`, status: "success" });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "seed_platforms") {
+      seedPlatformConfigs();
       return NextResponse.json({ ok: true });
     }
 
