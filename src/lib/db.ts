@@ -2,13 +2,24 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 
-const isVercel = !!process.env.VERCEL;
-const DB_FILENAME = process.env.DATABASE_PATH || "./data/equipe-ademilson.db";
-const dbPath = isVercel
-  ? path.join("/tmp", "equipe-ademilson.db")
-  : path.resolve(/* turbopackIgnore: true */ process.cwd(), DB_FILENAME);
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+function resolveDbPath(): string {
+  const envPath = process.env.DATABASE_PATH;
+  if (envPath && path.isAbsolute(envPath)) return envPath;
+  const relative = envPath || "./data/equipe-ademilson.db";
+  const resolved = path.resolve(/* turbopackIgnore: true */ process.cwd(), relative);
+  const dbDir = path.dirname(resolved);
+  try {
+    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+    return resolved;
+  } catch {
+    const tmpPath = path.join("/tmp", "equipe-ademilson.db");
+    const tmpDir = path.dirname(tmpPath);
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    return tmpPath;
+  }
+}
+
+const dbPath = resolveDbPath();
 
 let _db: Database.Database | null = null;
 
