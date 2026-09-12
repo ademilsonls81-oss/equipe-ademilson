@@ -2,8 +2,11 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 
+const isVercel = !!process.env.VERCEL;
 const DB_FILENAME = process.env.DATABASE_PATH || "./data/equipe-ademilson.db";
-const dbPath = path.resolve(/* turbopackIgnore: true */ process.cwd(), DB_FILENAME);
+const dbPath = isVercel
+  ? path.join("/tmp", "equipe-ademilson.db")
+  : path.resolve(/* turbopackIgnore: true */ process.cwd(), DB_FILENAME);
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
