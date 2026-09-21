@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1");
   const limit = 50;
   const offset = (page - 1) * limit;
-  const registrations = getAllRegistrations(limit, offset);
-  const stats = getStats();
+  const registrations = await getAllRegistrations(limit, offset);
+  const stats = await getStats();
   return NextResponse.json({ registrations, stats, page, limit });
 }

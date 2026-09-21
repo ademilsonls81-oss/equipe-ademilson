@@ -12,10 +12,10 @@ export async function GET(request: Request) {
 
   try {
     if (testId) {
-      const results = getABTestResults(testId);
+      const results = await getABTestResults(testId);
       return NextResponse.json(results);
     }
-    const tests = getABTests();
+    const tests = await getABTests();
     return NextResponse.json(tests);
   } catch {
     return NextResponse.json({ error: "Failed to fetch tests" }, { status: 500 });
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       if (!test_id || !test_name || !test_type || !variant_a || !variant_b) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
-      createABTest({ test_id, test_name, test_type, variant_a, variant_b, metric });
+      await createABTest({ test_id, test_name, test_type, variant_a, variant_b, metric });
       return NextResponse.json({ ok: true });
     }
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       if (!test_id || !session_id) {
         return NextResponse.json({ error: "test_id and session_id required" }, { status: 400 });
       }
-      const variant = assignABVariant(test_id, session_id);
+      const variant = await assignABVariant(test_id, session_id);
       return NextResponse.json({ variant });
     }
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       if (!test_id || !session_id) {
         return NextResponse.json({ error: "test_id and session_id required" }, { status: 400 });
       }
-      const results = recordABConversion(test_id, session_id);
+      const results = await recordABConversion(test_id, session_id);
       return NextResponse.json({ ok: true, results });
     }
 

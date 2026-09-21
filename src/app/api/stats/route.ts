@@ -3,8 +3,8 @@ import { getCount, getStats } from "@/lib/db";
 
 export async function GET() {
   try {
-    const total = getCount();
-    const stats = getStats();
+    const total = await getCount();
+    const stats = await getStats();
     return NextResponse.json({
       total,
       recent_week: stats.recent_week,

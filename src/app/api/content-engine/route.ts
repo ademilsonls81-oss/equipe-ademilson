@@ -10,7 +10,7 @@ import {
   getCampaignContents, getCampaignStats, updateCampaignContent, seedPrimeiraCampanha,
   getPublicationQueue, getPublicationQueueStats, addToPublicationQueue, updatePublicationQueue,
   getAutomationStatus, getAllPlatformConfigs, upsertPlatformConfig, seedPlatformConfigs,
-  getPlatformConfig,
+  getPlatformConfig, deletePublicationQueueItem,
 } from "@/lib/db";
 
 export async function GET(request: Request) {
@@ -22,49 +22,49 @@ export async function GET(request: Request) {
 
   try {
     if (url.searchParams.get("dashboard") === "true") {
-      return NextResponse.json(getContentEngineDashboard());
+      return NextResponse.json(await getContentEngineDashboard());
     }
     if (url.searchParams.get("topics") === "true") {
       const status = url.searchParams.get("status") || undefined;
-      return NextResponse.json(getTopics(status));
+      return NextResponse.json(await getTopics(status));
     }
     if (url.searchParams.get("drafts") === "true") {
       const platform = url.searchParams.get("platform") || undefined;
       const status = url.searchParams.get("status") || undefined;
       const limit = parseInt(url.searchParams.get("limit") || "50");
-      return NextResponse.json(getDrafts({ platform, status, limit }));
+      return NextResponse.json(await getDrafts({ platform, status, limit }));
     }
     if (url.searchParams.get("schedule") === "true") {
-      return NextResponse.json(getSchedule());
+      return NextResponse.json(await getSchedule());
     }
     if (url.searchParams.get("stats") === "true") {
-      return NextResponse.json(getDraftStats());
+      return NextResponse.json(await getDraftStats());
     }
     if (url.searchParams.get("agent") === "true") {
       return NextResponse.json({
-        ...getAgentMode(),
-        enabled: getAgentConfig("content_agent_enabled") !== "false",
-        lastRun: getAgentConfig("content_agent_last_run"),
-        nextRun: getAgentConfig("content_agent_next_run"),
+        ...(await getAgentMode()),
+        enabled: (await getAgentConfig("content_agent_enabled")) !== "false",
+        lastRun: await getAgentConfig("content_agent_last_run"),
+        nextRun: await getAgentConfig("content_agent_next_run"),
       });
     }
     if (url.searchParams.get("learning") === "true") {
-      return NextResponse.json(getLearningInsights());
+      return NextResponse.json(await getLearningInsights());
     }
     if (url.searchParams.get("learning_full") === "true") {
-      const insights = getLearningInsights();
+      const insights = await getLearningInsights();
       return NextResponse.json(insights);
     }
     if (url.searchParams.get("score") === "true") {
-      return NextResponse.json(calculateWeightedScore());
+      return NextResponse.json(await calculateWeightedScore());
     }
     if (url.searchParams.get("mode") === "true") {
-      return NextResponse.json(getAgentMode());
+      return NextResponse.json(await getAgentMode());
     }
     if (url.searchParams.get("campaign") === "true") {
       const campaignId = url.searchParams.get("campaign_id") || "primeiro-100-membros";
-      const contents = getCampaignContents(campaignId);
-      const stats = getCampaignStats(campaignId);
+      const contents = await getCampaignContents(campaignId);
+      const stats = await getCampaignStats(campaignId);
       return NextResponse.json({ contents, stats });
     }
     if (url.searchParams.get("queue") === "true") {
@@ -73,20 +73,20 @@ export async function GET(request: Request) {
       const campaignId = url.searchParams.get("campaign_id") || undefined;
       const limit = parseInt(url.searchParams.get("limit") || "50");
       const offset = parseInt(url.searchParams.get("offset") || "0");
-      const items = getPublicationQueue({ status, platform, campaign_id: campaignId, limit, offset });
-      const stats = getPublicationQueueStats();
+      const items = await getPublicationQueue({ status, platform, campaign_id: campaignId, limit, offset });
+      const stats = await getPublicationQueueStats();
       return NextResponse.json({ items, stats });
     }
     if (url.searchParams.get("automation") === "true") {
-      return NextResponse.json(getAutomationStatus());
+      return NextResponse.json(await getAutomationStatus());
     }
     if (url.searchParams.get("platforms") === "true") {
-      seedPlatformConfigs();
-      const configs = getAllPlatformConfigs();
+      await seedPlatformConfigs();
+      const configs = await getAllPlatformConfigs();
       return NextResponse.json(configs);
     }
 
-    return NextResponse.json(getContentEngineDashboard());
+    return NextResponse.json(await getContentEngineDashboard());
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Internal error" }, { status: 500 });
   }
@@ -105,71 +105,71 @@ export async function POST(request: Request) {
       const { title, description, category, relevance, traffic_potential, conversion_potential, priority, tags } = body;
       if (!title || !category) return NextResponse.json({ error: "title and category required" }, { status: 400 });
       const topicId = "TOP" + Date.now().toString(36).toUpperCase();
-      createTopic({ topic_id: topicId, title, description, category, relevance, traffic_potential, conversion_potential, priority, tags });
-      createAgentLog({ agent_type: "content_engine", action: "add_topic", details: `Topic "${title}" added`, status: "success" });
+      await createTopic({ topic_id: topicId, title, description, category, relevance, traffic_potential, conversion_potential, priority, tags });
+      await createAgentLog({ agent_type: "content_engine", action: "add_topic", details: `Topic "${title}" added`, status: "success" });
       return NextResponse.json({ ok: true, topic_id: topicId });
     }
 
     if (action === "update_topic_status") {
       const { topic_id, status } = body;
       if (!topic_id || !status) return NextResponse.json({ error: "topic_id and status required" }, { status: 400 });
-      updateTopicStatus(topic_id, status);
+      await updateTopicStatus(topic_id, status);
       return NextResponse.json({ ok: true });
     }
 
     if (action === "generate_content") {
       const { topic_id, platform } = body;
       if (!topic_id || !platform) return NextResponse.json({ error: "topic_id and platform required" }, { status: 400 });
-      const draftId = generateContentForTopic(topic_id, platform);
+      const draftId = await generateContentForTopic(topic_id, platform);
       if (!draftId) return NextResponse.json({ error: "Topic not found" }, { status: 404 });
-      createAgentLog({ agent_type: "content_engine", action: "generate_content", details: `Generated ${platform} content for topic ${topic_id}`, status: "success" });
+      await createAgentLog({ agent_type: "content_engine", action: "generate_content", details: `Generated ${platform} content for topic ${topic_id}`, status: "success" });
       return NextResponse.json({ ok: true, draft_id: draftId });
     }
 
     if (action === "update_draft") {
       const { draft_id, ...data } = body;
       if (!draft_id) return NextResponse.json({ error: "draft_id required" }, { status: 400 });
-      updateDraft(draft_id, data);
+      await updateDraft(draft_id, data);
       return NextResponse.json({ ok: true });
     }
 
     if (action === "approve") {
       const { draft_id } = body;
       if (!draft_id) return NextResponse.json({ error: "draft_id required" }, { status: 400 });
-      updateDraft(draft_id, { status: "aprovado" });
-      createAgentLog({ agent_type: "content_engine", action: "approve", details: `Draft ${draft_id} approved`, status: "success" });
+      await updateDraft(draft_id, { status: "aprovado" });
+      await createAgentLog({ agent_type: "content_engine", action: "approve", details: `Draft ${draft_id} approved`, status: "success" });
       return NextResponse.json({ ok: true });
     }
 
     if (action === "schedule") {
       const { draft_id, scheduled_for } = body;
       if (!draft_id || !scheduled_for) return NextResponse.json({ error: "draft_id and scheduled_for required" }, { status: 400 });
-      const scheduleId = scheduleContent(draft_id, scheduled_for);
+      const scheduleId = await scheduleContent(draft_id, scheduled_for);
       if (!scheduleId) return NextResponse.json({ error: "Draft not found" }, { status: 404 });
-      createAgentLog({ agent_type: "content_engine", action: "schedule", details: `Draft ${draft_id} scheduled for ${scheduled_for}`, status: "success" });
+      await createAgentLog({ agent_type: "content_engine", action: "schedule", details: `Draft ${draft_id} scheduled for ${scheduled_for}`, status: "success" });
       return NextResponse.json({ ok: true, schedule_id: scheduleId });
     }
 
     if (action === "set_platform_limit") {
       const { platform, daily_limit } = body;
       if (!platform || !daily_limit) return NextResponse.json({ error: "platform and daily_limit required" }, { status: 400 });
-      setPlatformLimit(platform, daily_limit);
+      await setPlatformLimit(platform, daily_limit);
       return NextResponse.json({ ok: true });
     }
 
     if (action === "toggle_agent") {
-      const current = getAgentConfig("content_agent_enabled");
+      const current = await getAgentConfig("content_agent_enabled");
       const newValue = current === "false" ? "true" : "false";
-      setAgentConfig("content_agent_enabled", newValue);
-      createAgentLog({ agent_type: "content_engine", action: "toggle_agent", details: `Content agent ${newValue === "true" ? "enabled" : "disabled"}`, status: "success" });
+      await setAgentConfig("content_agent_enabled", newValue);
+      await createAgentLog({ agent_type: "content_engine", action: "toggle_agent", details: `Content agent ${newValue === "true" ? "enabled" : "disabled"}`, status: "success" });
       return NextResponse.json({ ok: true, enabled: newValue === "true" });
     }
 
     if (action === "toggle_pause") {
-      const current = getAgentConfig("acquisition_paused");
+      const current = await getAgentConfig("acquisition_paused");
       const newValue = current === "true" ? "false" : "true";
-      setAgentConfig("acquisition_paused", newValue);
-      createAgentLog({ agent_type: "content_engine", action: "toggle_pause", details: `Acquisition ${newValue === "true" ? "paused" : "resumed"}`, status: "success" });
+      await setAgentConfig("acquisition_paused", newValue);
+      await createAgentLog({ agent_type: "content_engine", action: "toggle_pause", details: `Acquisition ${newValue === "true" ? "paused" : "resumed"}`, status: "success" });
       return NextResponse.json({ ok: true, paused: newValue === "true" });
     }
 
@@ -189,12 +189,12 @@ export async function POST(request: Request) {
         { title: "Dinheiro extra no celular", category: "renda", relevance: 90, traffic_potential: 90, conversion_potential: 85, priority: 90 },
       ];
       let created = 0;
-      topics.forEach(t => {
+      for (const t of topics) {
         const topicId = "TOP" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
-        createTopic({ topic_id: topicId, ...t });
+        await createTopic({ topic_id: topicId, ...t });
         created++;
-      });
-      createAgentLog({ agent_type: "content_engine", action: "seed_topics", details: `${created} topics seeded`, status: "success" });
+      }
+      await createAgentLog({ agent_type: "content_engine", action: "seed_topics", details: `${created} topics seeded`, status: "success" });
       return NextResponse.json({ ok: true, created });
     }
 
@@ -204,12 +204,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "mode must be 'test', 'autonomous', or 'paused'" }, { status: 400 });
       }
       if (mode === "autonomous") {
-        const score = calculateWeightedScore();
+        const score = await calculateWeightedScore();
         if (!score.hasEnoughData) {
           return NextResponse.json({ error: "Dados insuficientes para modo autônomo. Continúe em modo teste.", hasEnoughData: false }, { status: 400 });
         }
       }
-      setAgentMode(mode);
+      await setAgentMode(mode);
       return NextResponse.json({ ok: true, mode });
     }
 
@@ -218,12 +218,12 @@ export async function POST(request: Request) {
       if (!threshold || typeof threshold !== "number" || threshold < 1) {
         return NextResponse.json({ error: "threshold must be a positive number" }, { status: 400 });
       }
-      setMinDataThreshold(threshold);
+      await setMinDataThreshold(threshold);
       return NextResponse.json({ ok: true, threshold });
     }
 
     if (action === "seed_campaign") {
-      const result = seedPrimeiraCampanha();
+      const result = await seedPrimeiraCampanha();
       return NextResponse.json({ ok: true, ...result });
     }
 
@@ -232,7 +232,7 @@ export async function POST(request: Request) {
       if (!campaign_id || content_index === undefined || !platform) {
         return NextResponse.json({ error: "campaign_id, content_index, and platform required" }, { status: 400 });
       }
-      updateCampaignContent(campaign_id, content_index, platform, data);
+      await updateCampaignContent(campaign_id, content_index, platform, data);
       return NextResponse.json({ ok: true });
     }
 
@@ -241,45 +241,44 @@ export async function POST(request: Request) {
       if (!campaign_id || !content_id || !platform || !title || !content || !scheduled_at) {
         return NextResponse.json({ error: "campaign_id, content_id, platform, title, content, and scheduled_at required" }, { status: 400 });
       }
-      const item = addToPublicationQueue({
+      const item = await addToPublicationQueue({
         campaign_id, content_id, platform, title, content,
         media_url, destination_url, utm_source, utm_medium, utm_campaign, utm_content,
         scheduled_at, status: "draft",
       });
-      createAgentLog({ agent_type: "content_engine", action: "add_to_queue", details: `Content "${title}" added to queue for ${platform}`, status: "success" });
+      await createAgentLog({ agent_type: "content_engine", action: "add_to_queue", details: `Content "${title}" added to queue for ${platform}`, status: "success" });
       return NextResponse.json({ ok: true, item });
     }
 
     if (action === "approve_queue_item") {
       const { item_id } = body;
       if (!item_id) return NextResponse.json({ error: "item_id required" }, { status: 400 });
-      updatePublicationQueue(item_id, { status: "approved" });
-      createAgentLog({ agent_type: "content_engine", action: "approve_queue_item", details: `Queue item ${item_id} approved`, status: "success" });
+      await updatePublicationQueue(item_id, { status: "approved" });
+      await createAgentLog({ agent_type: "content_engine", action: "approve_queue_item", details: `Queue item ${item_id} approved`, status: "success" });
       return NextResponse.json({ ok: true });
     }
 
     if (action === "schedule_queue_item") {
       const { item_id, scheduled_at } = body;
       if (!item_id || !scheduled_at) return NextResponse.json({ error: "item_id and scheduled_at required" }, { status: 400 });
-      updatePublicationQueue(item_id, { status: "scheduled", scheduled_at });
-      createAgentLog({ agent_type: "content_engine", action: "schedule_queue_item", details: `Queue item ${item_id} scheduled for ${scheduled_at}`, status: "success" });
+      await updatePublicationQueue(item_id, { status: "scheduled", scheduled_at });
+      await createAgentLog({ agent_type: "content_engine", action: "schedule_queue_item", details: `Queue item ${item_id} scheduled for ${scheduled_at}`, status: "success" });
       return NextResponse.json({ ok: true });
     }
 
     if (action === "cancel_queue_item") {
       const { item_id } = body;
       if (!item_id) return NextResponse.json({ error: "item_id required" }, { status: 400 });
-      updatePublicationQueue(item_id, { status: "paused" });
-      createAgentLog({ agent_type: "content_engine", action: "cancel_queue_item", details: `Queue item ${item_id} cancelled`, status: "success" });
+      await updatePublicationQueue(item_id, { status: "paused" });
+      await createAgentLog({ agent_type: "content_engine", action: "cancel_queue_item", details: `Queue item ${item_id} cancelled`, status: "success" });
       return NextResponse.json({ ok: true });
     }
 
     if (action === "delete_queue_item") {
       const { item_id } = body;
       if (!item_id) return NextResponse.json({ error: "item_id required" }, { status: 400 });
-      const db = (await import("@/lib/db")).default();
-      db.prepare("DELETE FROM publication_queue WHERE id = ?").run(item_id);
-      createAgentLog({ agent_type: "content_engine", action: "delete_queue_item", details: `Queue item ${item_id} deleted`, status: "success" });
+      await deletePublicationQueueItem(item_id);
+      await createAgentLog({ agent_type: "content_engine", action: "delete_queue_item", details: `Queue item ${item_id} deleted`, status: "success" });
       return NextResponse.json({ ok: true });
     }
 
@@ -290,7 +289,7 @@ export async function POST(request: Request) {
       }
       let added = 0;
       for (const item of queueItems) {
-        addToPublicationQueue({
+        await addToPublicationQueue({
           campaign_id,
           content_id: item.content_id || `${campaign_id}-${item.platform}-${item.title?.substring(0, 20)}`,
           platform: item.platform,
@@ -307,20 +306,20 @@ export async function POST(request: Request) {
         });
         added++;
       }
-      createAgentLog({ agent_type: "content_engine", action: "bulk_add_to_queue", details: `${added} items added to queue for campaign ${campaign_id}`, status: "success" });
+      await createAgentLog({ agent_type: "content_engine", action: "bulk_add_to_queue", details: `${added} items added to queue for campaign ${campaign_id}`, status: "success" });
       return NextResponse.json({ ok: true, added });
     }
 
     if (action === "update_platform_config") {
       const { platform, api_configured, api_token, api_secret, api_key, daily_limit, enabled } = body;
       if (!platform) return NextResponse.json({ error: "platform required" }, { status: 400 });
-      upsertPlatformConfig(platform, { api_configured, api_token, api_secret, api_key, daily_limit, enabled });
-      createAgentLog({ agent_type: "content_engine", action: "update_platform_config", details: `Platform ${platform} config updated`, status: "success" });
+      await upsertPlatformConfig(platform, { api_configured, api_token, api_secret, api_key, daily_limit, enabled });
+      await createAgentLog({ agent_type: "content_engine", action: "update_platform_config", details: `Platform ${platform} config updated`, status: "success" });
       return NextResponse.json({ ok: true });
     }
 
     if (action === "seed_platforms") {
-      seedPlatformConfigs();
+      await seedPlatformConfigs();
       return NextResponse.json({ ok: true });
     }
 

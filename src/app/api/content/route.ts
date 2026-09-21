@@ -14,10 +14,10 @@ export async function GET(request: Request) {
 
   try {
     if (url.searchParams.get("stats") === "true") {
-      const stats = getContentStats();
+      const stats = await getContentStats();
       return NextResponse.json(stats);
     }
-    const content = getContentPerformance({ platform, status, limit });
+    const content = await getContentPerformance({ platform, status, limit });
     return NextResponse.json(content);
   } catch {
     return NextResponse.json({ error: "Failed to fetch content" }, { status: 500 });
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       if (!content_id || !title || !platform || !content_type) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
-      createContentPerformance({ content_id, title, platform, content_type, theme, keywords, utm_source, utm_medium, utm_campaign, url });
+      await createContentPerformance({ content_id, title, platform, content_type, theme, keywords, utm_source, utm_medium, utm_campaign, url });
       return NextResponse.json({ ok: true });
     }
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       if (!content_id) {
         return NextResponse.json({ error: "content_id required" }, { status: 400 });
       }
-      updateContentPerformance(content_id, { sessions, registrations, whatsapp_clicks, whatsapp_joins, referrals, score, status });
+      await updateContentPerformance(content_id, { sessions, registrations, whatsapp_clicks, whatsapp_joins, referrals, score, status });
       return NextResponse.json({ ok: true });
     }
 

@@ -10,8 +10,11 @@ import {
   setAgentConfig,
   createAgentLog,
   getPlatformConfig,
+  getSocialAccounts,
   checkPlatformDailyLimit,
+  isDuplicatePublication,
 } from "@/lib/db";
+import { decryptToken } from "@/lib/crypto";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -25,7 +28,7 @@ function verifyCronAuth(request: NextRequest): boolean {
 
 async function publishToPlatform(item: any): Promise<{ success: boolean; external_post_id?: string; error?: string }> {
   const platform = item.platform;
-  const config = getPlatformConfig(platform);
+  const config = await getPlatformConfig(platform);
 
   if (!config || !config.api_configured) {
     return { success: false, error: `API do ${platform} não configurada. Configure as credenciais em Platform Config.` };
@@ -35,32 +38,54 @@ async function publishToPlatform(item: any): Promise<{ success: boolean; externa
     return { success: false, error: `Plataforma ${platform} está desabilitada.` };
   }
 
-  const limitCheck = checkPlatformDailyLimit(platform);
+  // Verificar duplicação
+  if (item.content_id && await isDuplicatePublication(item.content_id, platform)) {
+    return { success: false, error: `Publicação já realizada para este conteúdo na plataforma ${platform}.` };
+  }
+
+  const limitCheck = await checkPlatformDailyLimit(platform);
   if (!limitCheck.allowed) {
     return { success: false, error: `Limite diário do ${platform} atingido (${limitCheck.current}/${limitCheck.limit}).` };
   }
+
+  // Ler token da social_accounts (criptografado) e descriptografar
+  const accounts = await getSocialAccounts(platform);
+  const connectedAccount = accounts.find((a: any) => a.status === "connected" && a.access_token);
+  if (!connectedAccount) {
+    return { success: false, error: `Nenhuma conta conectada para ${platform}. Conecte uma conta em Conectar Redes.` };
+  }
+  const accessToken = decryptToken(connectedAccount.access_token);
+  const refreshToken = connectedAccount.refresh_token ? decryptToken(connectedAccount.refresh_token) : undefined;
+
+  // Montar config com token descriptografado
+  const liveConfig = {
+    ...config,
+    api_token: accessToken,
+    api_secret: refreshToken || config.api_secret,
+    api_key: config.api_key,
+  };
 
   try {
     let result: { success: boolean; external_post_id?: string; error?: string };
 
     switch (platform) {
       case "youtube":
-        result = await publishToYouTube(item, config);
+        result = await publishToYouTube(item, liveConfig);
         break;
       case "tiktok":
-        result = await publishToTikTok(item, config);
+        result = await publishToTikTok(item, liveConfig);
         break;
       case "instagram":
-        result = await publishToInstagram(item, config);
+        result = await publishToInstagram(item, liveConfig);
         break;
       case "facebook":
-        result = await publishToFacebook(item, config);
+        result = await publishToFacebook(item, liveConfig);
         break;
       case "pinterest":
-        result = await publishToPinterest(item, config);
+        result = await publishToPinterest(item, liveConfig);
         break;
       case "reddit":
-        result = await publishToReddit(item, config);
+        result = await publishToReddit(item, liveConfig);
         break;
       default:
         result = { success: false, error: `Plataforma ${platform} não suportada.` };
@@ -146,9 +171,19 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
   }
 
   try {
+    const caption = `${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`;
+
+    // Step 1: Create media container
     const containerResponse = await fetch(
-      `https://graph.facebook.com/v19.0/me/media?caption=${encodeURIComponent(`${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`)}&access_token=${config.api_token}`,
-      { method: "POST" }
+      `https://graph.facebook.com/v19.0/me/media`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          caption,
+          access_token: config.api_token,
+        }).toString(),
+      }
     );
 
     if (!containerResponse.ok) {
@@ -159,9 +194,17 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
     const containerData = await containerResponse.json();
     const mediaId = containerData.id;
 
+    // Step 2: Publish container
     const publishResponse = await fetch(
-      `https://graph.facebook.com/v19.0/me/media_publish?creation_id=${mediaId}&access_token=${config.api_token}`,
-      { method: "POST" }
+      `https://graph.facebook.com/v19.0/me/media_publish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          creation_id: mediaId,
+          access_token: config.api_token,
+        }).toString(),
+      }
     );
 
     if (!publishResponse.ok) {
@@ -182,9 +225,36 @@ async function publishToFacebook(item: any, config: any): Promise<{ success: boo
   }
 
   try {
+    // Buscar páginas do usuário e usar a primeira com Page Token
+    const pagesResponse = await fetch(
+      `https://graph.facebook.com/v19.0/me/accounts?access_token=${config.api_token}`
+    );
+    const pagesData = await pagesResponse.json();
+
+    let pageId: string;
+    let pageToken: string;
+
+    if (pagesResponse.ok && pagesData.data?.length > 0) {
+      const page = pagesData.data[0];
+      pageId = page.id;
+      pageToken = page.access_token;
+    } else {
+      // Fallback: usar token do usuário (funciona para timelines pessoais)
+      pageId = "me";
+      pageToken = config.api_token;
+    }
+
+    const message = `${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`;
     const response = await fetch(
-      `https://graph.facebook.com/v19.0/me/feed?message=${encodeURIComponent(`${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`)}&access_token=${config.api_token}`,
-      { method: "POST" }
+      `https://graph.facebook.com/v19.0/${pageId}/feed`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          message,
+          access_token: pageToken,
+        }).toString(),
+      }
     );
 
     if (!response.ok) {
@@ -283,9 +353,9 @@ export async function GET(request: NextRequest) {
   const results: any[] = [];
 
   try {
-    const mode = getAgentMode();
+    const mode = await getAgentMode();
     if (mode.mode === "paused") {
-      createAgentLog({
+      await createAgentLog({
         agent_type: "cron",
         action: "process_queue",
         details: "Fila pausada — nenhuma publicação processada",
@@ -294,12 +364,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, message: "Queue paused", results: [], duration_ms: Date.now() - startTime });
     }
 
-    setAgentConfig("cron_last_run", new Date().toISOString());
+    await setAgentConfig("cron_last_run", new Date().toISOString());
     const nextRun = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-    setAgentConfig("cron_next_run", nextRun);
+    await setAgentConfig("cron_next_run", nextRun);
 
-    const pendingItems = getPendingPublications();
-    const retryItems = getFailedRetries();
+    const pendingItems = await getPendingPublications();
+    const retryItems = await getFailedRetries();
     const allItems = [...pendingItems, ...retryItems];
 
     const uniqueItems = allItems.filter((item, index, self) =>
@@ -308,7 +378,7 @@ export async function GET(request: NextRequest) {
 
     for (const item of uniqueItems) {
       if (mode.mode === "test") {
-        updatePublicationQueue(item.id, { status: "approved" });
+        await updatePublicationQueue(item.id, { status: "approved" });
         results.push({
           id: item.id,
           platform: item.platform,
@@ -319,12 +389,12 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      updatePublicationQueue(item.id, { status: "publishing" });
+      await updatePublicationQueue(item.id, { status: "publishing" });
 
       const result = await publishToPlatform(item);
 
       if (result.success) {
-        markAsPublished(item.id, result.external_post_id || "manual");
+        await markAsPublished(item.id, result.external_post_id || "manual");
         results.push({
           id: item.id,
           platform: item.platform,
@@ -333,7 +403,7 @@ export async function GET(request: NextRequest) {
           external_post_id: result.external_post_id,
         });
       } else {
-        markAsFailed(item.id, result.error || "Erro desconhecido");
+        await markAsFailed(item.id, result.error || "Erro desconhecido");
         results.push({
           id: item.id,
           platform: item.platform,
@@ -344,7 +414,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    createAgentLog({
+    await createAgentLog({
       agent_type: "cron",
       action: "process_queue",
       details: `Processados ${results.length} itens: ${results.filter(r => r.action === "published").length} publicados, ${results.filter(r => r.action === "failed").length} falhas, ${results.filter(r => r.action === "approved_for_review").length} aguardando revisão`,
@@ -361,7 +431,7 @@ export async function GET(request: NextRequest) {
       duration_ms: Date.now() - startTime,
     });
   } catch (error: any) {
-    createAgentLog({
+    await createAgentLog({
       agent_type: "cron",
       action: "process_queue",
       details: `Erro no processamento: ${error.message}`,

@@ -1,8 +1,24 @@
 {
   "crons": [
     {
+      "path": "/api/cron/daily-content",
+      "schedule": "0 11 * * *",
+      "comment": "Gera conteúdo diário às 08h BRT (11h UTC)"
+    },
+    {
       "path": "/api/cron/process-queue",
-      "schedule": "0 0 * * *"
+      "schedule": "*/15 * * * *",
+      "comment": "Processa fila de publicações a cada 15 minutos"
+    },
+    {
+      "path": "/api/cron/weekly-plan",
+      "schedule": "0 10 * * 0",
+      "comment": "Gera plano semanal todo Domingo às 07h BRT (10h UTC)"
+    },
+    {
+      "path": "/api/cron/health-check",
+      "schedule": "0 12 * * *",
+      "comment": "Health check diário às 09h BRT (12h UTC)"
     }
   ]
 }

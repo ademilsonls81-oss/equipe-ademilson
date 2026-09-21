@@ -13,13 +13,13 @@ export async function GET(request: Request) {
   try {
     if (url.searchParams.get("config") === "true") {
       const config = {
-        enabled: getAgentConfig("agent_enabled") !== "false",
-        lastAnalysis: getAgentConfig("last_analysis"),
-        lastGeneration: getAgentConfig("last_generation"),
+        enabled: (await getAgentConfig("agent_enabled")) !== "false",
+        lastAnalysis: await getAgentConfig("last_analysis"),
+        lastGeneration: await getAgentConfig("last_generation"),
       };
       return NextResponse.json(config);
     }
-    const logs = getAgentLogs(limit);
+    const logs = await getAgentLogs(limit);
     return NextResponse.json(logs);
   } catch {
     return NextResponse.json({ error: "Failed to fetch logs" }, { status: 500 });
@@ -37,21 +37,21 @@ export async function POST(req: NextRequest) {
 
     if (action === "log") {
       const { agent_type, action: logAction, details, status, error_message } = body;
-      createAgentLog({ agent_type, action: logAction, details, status, error_message });
+      await createAgentLog({ agent_type, action: logAction, details, status, error_message });
       return NextResponse.json({ ok: true });
     }
 
     if (action === "config") {
       const { key, value } = body;
-      setAgentConfig(key, value);
+      await setAgentConfig(key, value);
       return NextResponse.json({ ok: true });
     }
 
     if (action === "toggle") {
-      const current = getAgentConfig("agent_enabled");
+      const current = await getAgentConfig("agent_enabled");
       const newValue = current === "false" ? "true" : "false";
-      setAgentConfig("agent_enabled", newValue);
-      createAgentLog({
+      await setAgentConfig("agent_enabled", newValue);
+      await createAgentLog({
         agent_type: "system",
         action: "toggle_agent",
         details: `Agent ${newValue === "true" ? "enabled" : "disabled"}`,

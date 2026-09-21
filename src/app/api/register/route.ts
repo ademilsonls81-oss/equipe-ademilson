@@ -18,13 +18,13 @@ export async function POST(req: NextRequest) {
 
     let referral_code: string | null = null;
     if (ref) {
-      const rc = getReferralCode(ref);
+      const rc = await getReferralCode(ref);
       if (rc) referral_code = rc.code;
     }
 
     const url = new URL(req.url);
     const uid = generateUid();
-    const reg = createRegistration({
+    const reg = await createRegistration({
       uid, name: name.trim(), whatsapp: whatsapp.replace(/\D/g,""),
       city: city.trim(), state, age_range, has_smartphone, has_support, how_found,
       referral_code,
@@ -35,10 +35,10 @@ export async function POST(req: NextRequest) {
     });
 
     const myCode = generateReferralCode(name);
-    createReferralCode(uid, myCode);
+    await createReferralCode(uid, myCode);
 
     if (session_id) {
-      createSession({
+      await createSession({
         session_id,
         ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined,
         landing_page: "/cadastro",
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
         utm_medium: utm_medium || url.searchParams.get("utm_medium") || undefined,
         utm_campaign: utm_campaign || url.searchParams.get("utm_campaign") || undefined,
       });
-      linkSessionToRegistration(session_id, uid);
+      await linkSessionToRegistration(session_id, uid);
     }
 
     return NextResponse.json({ success: true, uid, referral_code: myCode });

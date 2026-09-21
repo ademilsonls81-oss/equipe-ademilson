@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const stats = getFunnelStats();
+    const stats = await getFunnelStats();
     return NextResponse.json(stats);
   } catch {
     return NextResponse.json({ error: "Failed to fetch funnel stats" }, { status: 500 });

@@ -7,8 +7,7 @@
 
 **Equipe Ademilson** é um site de divulgação de projetos de gravação de vídeos em primeira pessoa (POV) para treinamento de Inteligência Artificial.
 
-- **URL Produção:** https://equipe-ademilson.com.br
-- **URL Vercel:** https://equipe-ademilson.vercel.app/
+- **URL Produção:** https://equipe-ademilson.vercel.app
 - **URL Local:** http://localhost:3000
 - **Repositório:** https://github.com/ademilsonls81-oss/equipe-ademilson
 - **Stack:** Next.js 16, TypeScript, SQLite, Tailwind CSS
@@ -116,11 +115,10 @@
 
 | Recurso | URL |
 |---------|-----|
-| Site principal | https://equipe-ademilson.com.br |
-| Vercel | https://equipe-ademilson.vercel.app/ |
-| Admin | https://equipe-ademilson.com.br/admin |
-| Kit de Marca | https://equipe-ademilson.com.br/kit-de-marca |
-| Assistente | https://equipe-ademilson.com.br/assistente-configuracao |
+| Site principal | https://equipe-ademilson.vercel.app |
+| Admin | https://equipe-ademilson.vercel.app/admin |
+| Kit de Marca | https://equipe-ademilson.vercel.app/kit-de-marca |
+| Assistente | https://equipe-ademilson.vercel.app/assistente-configuracao |
 | GitHub | https://github.com/ademilsonls81-oss/equipe-ademilson |
 | Grupo WhatsApp | https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2 |
 

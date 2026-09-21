@@ -1,0 +1,62 @@
+🧪 TESTE E2E - MÁQUINA DE AQUISIÇÃO
+
+============================================================
+
+1️⃣ TESTE: Pageview sem UTM (acesso direto)
+❌ FALHOU - 
+
+2️⃣ TESTE: Pageview com UTM parameters
+❌ FALHOU - 
+
+3️⃣ TESTE: Cadastro com UTM preservada
+❌ FALHOU - 
+
+4️⃣ TESTE: Clique WhatsApp
+❌ FALHOU - 
+
+5️⃣ TESTE: Cadastro por indicação
+❌ FALHOU - 
+
+6️⃣ TESTE: Referral tracking (compartilhamento)
+❌ FALHOU - 
+
+7️⃣ TESTE: Conversão de indicação
+❌ FALHOU - 
+
+8️⃣ TESTE: API Funil
+❌ FALHOU - 
+
+9️⃣ TESTE: API Command Center
+❌ FALHOU - 
+
+🔟 TESTE: API Alertas
+❌ FALHOU - 
+
+1️⃣1️⃣ TESTE: API Forecast
+❌ FALHOU - 
+
+1️⃣2️⃣ TESTE: API Canais
+❌ FALHOU - 
+
+1️⃣3️⃣ TESTE: API Recomendações
+❌ FALHOU - 
+
+============================================================
+📊 RESUMO DOS TESTES
+
+❌ 1. Pageview direto: 
+❌ 2. Pageview com UTM: 
+❌ 3. Cadastro com UTM: 
+❌ 4. Clique WhatsApp: 
+❌ 5. Cadastro por indicação: 
+❌ 6. Referral tracking: 
+❌ 7. Conversão indicação: 
+❌ 8. API Funil: 
+❌ 9. API Command Center: 
+❌ 10. API Alertas: 
+❌ 11. API Forecast: 
+❌ 12. API Canais: 
+❌ 13. API Recomendações: 
+
+✅ Passou: 0/13
+❌ Falhou: 13/13

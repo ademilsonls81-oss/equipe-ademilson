@@ -58,6 +58,51 @@ type AutomationStatus = {
   next_cron_run: string | null;
 };
 
+type SocialPlatformStatus = {
+  platform: string;
+  connected: boolean;
+  accounts: { id: number; account_name: string; status: string; connected_at: string; avatar_url: string | null }[];
+  api_configured: boolean;
+  daily_limit: number;
+};
+
+type SocialAccount = {
+  id: number;
+  platform: string;
+  account_name: string;
+  account_id: string;
+  avatar_url: string | null;
+  status: string;
+  connected_at: string;
+  has_token: boolean;
+  has_refresh: boolean;
+};
+
+type SetupInstructions = {
+  title: string;
+  steps: string[];
+  env_vars: string[];
+  notes: string[];
+};
+
+const PLATFORM_ICONS: Record<string, string> = {
+  youtube: "📺",
+  instagram: "📷",
+  facebook: "📘",
+  tiktok: "🎵",
+  pinterest: "📌",
+  reddit: "🤖",
+};
+
+const PLATFORM_COLORS: Record<string, string> = {
+  youtube: "#FF0000",
+  instagram: "#E4405F",
+  facebook: "#1877F2",
+  tiktok: "#000000",
+  pinterest: "#BD081C",
+  reddit: "#FF4500",
+};
+
 const PLATFORMS = ["google", "youtube", "tiktok", "instagram", "facebook", "pinterest", "reddit"];
 
 export default function ContentEnginePage() {
@@ -71,7 +116,14 @@ export default function ContentEnginePage() {
   const [automation, setAutomation] = useState<AutomationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "learning" | "topics" | "drafts" | "schedule" | "automation">("dashboard");
+  const [socialPlatforms, setSocialPlatforms] = useState<SocialPlatformStatus[]>([]);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "learning" | "topics" | "drafts" | "schedule" | "automation" | "networks">("dashboard");
+  const [showSetup, setShowSetup] = useState<string | null>(null);
+  const [setupInstructions, setSetupInstructions] = useState<SetupInstructions | null>(null);
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const [manualConnect, setManualConnect] = useState<string | null>(null);
+  const [manualForm, setManualForm] = useState({ account_name: "", api_key: "", api_secret: "", api_token: "" });
 
   async function login(e: React.FormEvent) {
     e.preventDefault();
@@ -95,6 +147,7 @@ export default function ContentEnginePage() {
         if (learnRes.ok) setLearning(await learnRes.json());
         if (autoRes.ok) setAutomation(await autoRes.json());
         setAuthed(true);
+        fetchSocialData();
       } else { setError(true); }
     } catch { setError(true); }
     setLoading(false);
@@ -116,6 +169,104 @@ export default function ContentEnginePage() {
     if (modeRes.ok) setAgentMode(await modeRes.json());
     if (learnRes.ok) setLearning(await learnRes.json());
     if (autoRes.ok) setAutomation(await autoRes.json());
+  }
+
+  async function fetchSocialData() {
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
+    const [statusRes, accountsRes] = await Promise.all([
+      fetch("/api/social-accounts?status=true", { headers }),
+      fetch("/api/social-accounts?accounts=true", { headers }),
+    ]);
+    if (statusRes.ok) {
+      const data = await statusRes.json();
+      setSocialPlatforms(data.platforms || []);
+    }
+    if (accountsRes.ok) {
+      const data = await accountsRes.json();
+      setSocialAccounts(data.accounts || []);
+    }
+  }
+
+  async function connectPlatform(platform: string) {
+    setConnectingPlatform(platform);
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
+    try {
+      const res = await fetch(`/api/social-accounts?connect=true&platform=${platform}`, { headers });
+      const data = await res.json();
+      if (data.auth_url) {
+        window.location.href = data.auth_url;
+      } else if (data.setup_required) {
+        setShowSetup(platform);
+        setSetupInstructions(data.instructions);
+      } else if (data.error) {
+        alert(data.error);
+        if (data.instructions) {
+          setShowSetup(platform);
+          setSetupInstructions(data.instructions);
+        }
+      }
+    } catch {
+      alert("Erro ao conectar. Tente novamente.");
+    }
+    setConnectingPlatform(null);
+  }
+
+  async function fetchSetupInstructions(platform: string) {
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}` };
+    const res = await fetch(`/api/social-accounts?setup=true&platform=${platform}`, { headers });
+    const data = await res.json();
+    setSetupInstructions(data.instructions);
+    setShowSetup(platform);
+  }
+
+  async function connectManual(platform: string) {
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
+    const res = await fetch("/api/social-accounts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "connect_manual",
+        platform,
+        account_name: manualForm.account_name || `${platform}_oficial`,
+        api_key: manualForm.api_key || undefined,
+        api_secret: manualForm.api_secret || undefined,
+        api_token: manualForm.api_token || undefined,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setManualConnect(null);
+      setManualForm({ account_name: "", api_key: "", api_secret: "", api_token: "" });
+      await fetchSocialData();
+    } else {
+      alert(data.error || "Erro ao conectar");
+    }
+  }
+
+  async function disconnectAccount(id: number) {
+    if (!confirm("Tem certeza que deseja desconectar esta conta?")) return;
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
+    await fetch("/api/social-accounts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "disconnect", id }),
+    });
+    await fetchSocialData();
+  }
+
+  async function testConnection(id: number) {
+    const headers = { Authorization: `Basic ${btoa(`admin:${auth}`)}`, "Content-Type": "application/json" };
+    const res = await fetch("/api/social-accounts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "test_connection", id }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alert(`✅ Conexão OK! Conta: ${data.result.account}`);
+    } else {
+      alert(`❌ Falha: ${data.error}`);
+    }
   }
 
   async function setMode(mode: "test" | "autonomous" | "paused") {
@@ -213,6 +364,7 @@ export default function ContentEnginePage() {
         <button className={`${styles.tab} ${activeTab === "drafts" ? styles.tabActive : ""}`} onClick={() => setActiveTab("drafts")}>📝 Rascunhos</button>
         <button className={`${styles.tab} ${activeTab === "schedule" ? styles.tabActive : ""}`} onClick={() => setActiveTab("schedule")}>📅 Agenda</button>
         <button className={`${styles.tab} ${activeTab === "automation" ? styles.tabActive : ""}`} onClick={() => setActiveTab("automation")}>🤖 Automação</button>
+        <button className={`${styles.tab} ${activeTab === "networks" ? styles.tabActive : ""}`} onClick={() => { setActiveTab("networks"); fetchSocialData(); }}>🔗 Conectar Redes</button>
       </nav>
 
       {activeTab === "dashboard" && dashboard && (
@@ -497,6 +649,202 @@ export default function ContentEnginePage() {
             ) : (
               <div className={styles.emptyState}><p>Nenhum item na fila por plataforma.</p></div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "networks" && (
+        <div className={styles.content}>
+          {/* Status das Plataformas */}
+          <div className={styles.section}>
+            <h2>🔗 CONECTAR REDES SOCIAIS</h2>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
+              Conecte as contas oficiais da <strong>Equipe Ademilson</strong> para publicação automática de conteúdo.
+            </p>
+
+            <div className={styles.networkGrid}>
+              {["youtube", "instagram", "facebook", "tiktok", "pinterest", "reddit"].map((platform) => {
+                const status = socialPlatforms.find(p => p.platform === platform);
+                const isConnected = status?.connected || false;
+                const accounts = status?.accounts || [];
+                const platformAccounts = socialAccounts.filter(a => a.platform === platform);
+
+                return (
+                  <div key={platform} className={`${styles.networkCard} ${isConnected ? styles.networkConnected : ""}`}>
+                    <div className={styles.networkHeader}>
+                      <span className={styles.networkIcon} style={{ color: PLATFORM_COLORS[platform] }}>
+                        {PLATFORM_ICONS[platform]}
+                      </span>
+                      <span className={styles.networkName}>{platform.toUpperCase()}</span>
+                      <span className={`${styles.networkBadge} ${isConnected ? styles.networkBadgeOk : styles.networkBadgeOff}`}>
+                        {isConnected ? "🟢 Conectada" : "🔴 Não configurada"}
+                      </span>
+                    </div>
+
+                    {isConnected && accounts.length > 0 && (
+                      <div className={styles.networkAccount}>
+                        <span>{accounts[0].account_name}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          Conectada em {new Date(accounts[0].connected_at).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className={styles.networkInfo}>
+                      <div><strong>API:</strong> {status?.api_configured ? "✅ Configurada" : "❌ Não configurada"}</div>
+                      <div><strong>Limite:</strong> {status?.daily_limit || 0}/dia</div>
+                      <div><strong>Contas:</strong> {platformAccounts.length}</div>
+                    </div>
+
+                    <div className={styles.networkActions}>
+                      {!isConnected ? (
+                        <>
+                          <button
+                            className={styles.btnConnect}
+                            onClick={() => connectPlatform(platform)}
+                            disabled={connectingPlatform === platform}
+                          >
+                            {connectingPlatform === platform ? "Conectando..." : "🔗 CONECTAR"}
+                          </button>
+                          <button
+                            className={styles.btnSetup}
+                            onClick={() => fetchSetupInstructions(platform)}
+                          >
+                            📋 Instruções
+                          </button>
+                          <button
+                            className={styles.btnManual}
+                            onClick={() => setManualConnect(manualConnect === platform ? null : platform)}
+                          >
+                            ⚙️ Manual
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {platformAccounts.map((acc) => (
+                            <div key={acc.id} className={styles.accountActions}>
+                              <button className={styles.btnTest} onClick={() => testConnection(acc.id)}>
+                                🔍 Testar
+                              </button>
+                              <button className={styles.btnDisconnect} onClick={() => disconnectAccount(acc.id)}>
+                                ⏏️ Desconectar
+                              </button>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Formulário de conexão manual */}
+                    {manualConnect === platform && (
+                      <div className={styles.manualForm}>
+                        <h4>⚙️ Conexão Manual</h4>
+                        <input
+                          className={styles.input}
+                          placeholder="Nome da conta"
+                          value={manualForm.account_name}
+                          onChange={(e) => setManualForm({ ...manualForm, account_name: e.target.value })}
+                        />
+                        <input
+                          className={styles.input}
+                          placeholder="API Key (opcional)"
+                          value={manualForm.api_key}
+                          onChange={(e) => setManualForm({ ...manualForm, api_key: e.target.value })}
+                        />
+                        <input
+                          className={styles.input}
+                          placeholder="Access Token"
+                          value={manualForm.api_token}
+                          onChange={(e) => setManualForm({ ...manualForm, api_token: e.target.value })}
+                        />
+                        <input
+                          className={styles.input}
+                          placeholder="API Secret (opcional)"
+                          value={manualForm.api_secret}
+                          onChange={(e) => setManualForm({ ...manualForm, api_secret: e.target.value })}
+                        />
+                        <div className={styles.manualActions}>
+                          <button className={styles.btnConnect} onClick={() => connectManual(platform)}>
+                            💾 Salvar
+                          </button>
+                          <button className={styles.btnSetup} onClick={() => setManualConnect(null)}>
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Instruções de Setup */}
+          {showSetup && setupInstructions && (
+            <div className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <h2>📋 {setupInstructions.title}</h2>
+                <button className={styles.btnSmall} onClick={() => { setShowSetup(null); setSetupInstructions(null); }}>✕ Fechar</button>
+              </div>
+
+              <div className={styles.setupBox}>
+                <h3>Passos:</h3>
+                <ol className={styles.setupSteps}>
+                  {setupInstructions.steps.map((step, i) => (
+                    <li key={i}>{step.replace(/^\d+\.\s*/, "")}</li>
+                  ))}
+                </ol>
+
+                {setupInstructions.env_vars.length > 0 && (
+                  <div className={styles.setupEnvVars}>
+                    <h4>Environment Variables necessárias:</h4>
+                    <div className={styles.envVarList}>
+                      {setupInstructions.env_vars.map((v) => (
+                        <code key={v} className={styles.envVar}>{v}</code>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {setupInstructions.notes.length > 0 && (
+                  <div className={styles.setupNotes}>
+                    <h4>⚠️ Notas importantes:</h4>
+                    <ul>
+                      {setupInstructions.notes.map((note, i) => (
+                        <li key={i}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Resumo */}
+          <div className={styles.section}>
+            <h2>📊 RESUMO</h2>
+            <div className={styles.grid5} style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+              <div className={`${styles.cardBig} ${styles.cardGreen}`}>
+                <div className={styles.cardIcon}>🔗</div>
+                <div className={styles.cardValue}>{socialPlatforms.filter(p => p.connected).length}/6</div>
+                <div className={styles.cardLabel}>Conectadas</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>🤖</div>
+                <div className={styles.cardValue}>{socialPlatforms.filter(p => p.api_configured).length}/6</div>
+                <div className={styles.cardLabel}>API Configurada</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>📝</div>
+                <div className={styles.cardValue}>0</div>
+                <div className={styles.cardLabel}>Publicações Automáticas</div>
+              </div>
+            </div>
+
+            <div className={styles.warningBox}>
+              ⚠️ <strong>Modo atual:</strong> Publicação automática <strong>NÃO ATIVADA</strong>.<br />
+              Após conectar as contas, o sistema ficará pronto para publicar quando você ativar o modo autônomo.
+            </div>
           </div>
         </div>
       )}

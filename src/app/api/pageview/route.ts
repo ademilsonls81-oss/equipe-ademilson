@@ -11,11 +11,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (event === "whatsapp_click") {
-      markSessionClickedWhatsApp(session_id);
+      await markSessionClickedWhatsApp(session_id);
       return NextResponse.json({ ok: true });
     }
 
-    createSession({
+    await createSession({
       session_id,
       ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined,
       user_agent: req.headers.get("user-agent") || undefined,

@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const stats = getReferralStatsAdvanced();
+    const stats = await getReferralStatsAdvanced();
     return NextResponse.json(stats);
   } catch {
     return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       if (!referrer_uid || !referral_code) {
         return NextResponse.json({ error: "referrer_uid and referral_code required" }, { status: 400 });
       }
-      createReferralTracking({ referrer_uid, referral_code, link_used, utm_source, utm_medium, utm_campaign, platform, share_text, ab_test_id, visitor_session_id });
+      await createReferralTracking({ referrer_uid, referral_code, link_used, utm_source, utm_medium, utm_campaign, platform, share_text, ab_test_id, visitor_session_id });
       return NextResponse.json({ ok: true });
     }
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       if (!visitor_session_id || !converted_uid) {
         return NextResponse.json({ error: "visitor_session_id and converted_uid required" }, { status: 400 });
       }
-      markReferralConverted(visitor_session_id, converted_uid);
+      await markReferralConverted(visitor_session_id, converted_uid);
       return NextResponse.json({ ok: true });
     }
 

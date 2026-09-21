@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   if (!checkAdminAuth(req)) {
     return new NextResponse("Unauthorized", { status: 401, headers: { "WWW-Authenticate": "Basic realm=\"Admin\"" } });
   }
-  const csv = exportCsv();
+  const csv = await exportCsv();
   const date = new Date().toISOString().split("T")[0];
   return new NextResponse(csv, {
     headers: {

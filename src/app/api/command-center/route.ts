@@ -11,28 +11,28 @@ export async function GET(request: Request) {
 
   try {
     if (url.searchParams.get("alerts") === "true") {
-      return NextResponse.json(getEnhancedAlerts());
+      return NextResponse.json(await getEnhancedAlerts());
     }
     if (url.searchParams.get("channels") === "true") {
-      return NextResponse.json(getChannelStatus());
+      return NextResponse.json(await getChannelStatus());
     }
     if (url.searchParams.get("score") === "true") {
-      return NextResponse.json(getAcquisitionScore());
+      return NextResponse.json(await getAcquisitionScore());
     }
     if (url.searchParams.get("recommendations") === "true") {
-      return NextResponse.json(getAgentRecommendations());
+      return NextResponse.json(await getAgentRecommendations());
     }
     if (url.searchParams.get("forecast") === "true") {
-      return NextResponse.json(getGoalForecast());
+      return NextResponse.json(await getGoalForecast());
     }
     if (url.searchParams.get("autonomous") === "true") {
-      return NextResponse.json(getAutonomousStatus());
+      return NextResponse.json(await getAutonomousStatus());
     }
     if (url.searchParams.get("queue") === "true") {
-      return NextResponse.json(getContentQueueStats());
+      return NextResponse.json(await getContentQueueStats());
     }
 
-    const data = getCommandCenterData();
+    const data = await getCommandCenterData();
     return NextResponse.json(data);
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed to fetch data" }, { status: 500 });
@@ -51,23 +51,23 @@ export async function POST(request: Request) {
     if (action === "toggle_channel") {
       const { channel, enabled } = body;
       if (!channel) return NextResponse.json({ error: "channel required" }, { status: 400 });
-      toggleChannel(channel, enabled !== false);
-      return NextResponse.json({ ok: true, channels: getChannelStatus() });
+      await toggleChannel(channel, enabled !== false);
+      return NextResponse.json({ ok: true, channels: await getChannelStatus() });
     }
 
     if (action === "toggle_autonomous") {
       const { enabled } = body;
-      toggleAutonomousMode(enabled === true);
-      return NextResponse.json({ ok: true, autonomous: getAutonomousStatus() });
+      await toggleAutonomousMode(enabled === true);
+      return NextResponse.json({ ok: true, autonomous: await getAutonomousStatus() });
     }
 
     if (action === "calculate_score") {
-      const result = calculateAcquisitionScore();
+      const result = await calculateAcquisitionScore();
       return NextResponse.json({ ok: true, ...result });
     }
 
     if (action === "run_analysis") {
-      createAgentLog({ agent_type: "analysis", action: "manual_analysis", details: "Análise manual executada pelo admin", status: "success" });
+      await createAgentLog({ agent_type: "analysis", action: "manual_analysis", details: "Análise manual executada pelo admin", status: "success" });
       return NextResponse.json({ ok: true });
     }
 
