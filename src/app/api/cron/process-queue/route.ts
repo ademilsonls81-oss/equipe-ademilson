@@ -5,6 +5,7 @@ import {
   updatePublicationQueue,
   markAsPublished,
   markAsFailed,
+  resetStalePublishing,
   getAgentMode,
   getAgentConfig,
   setAgentConfig,
@@ -405,6 +406,9 @@ export async function GET(request: NextRequest) {
     const nextRun = new Date(Date.now() + 15 * 60 * 1000).toISOString();
     await setAgentConfig("cron_next_run", nextRun);
 
+    // Recupera itens presos em "publishing" por execuções anteriores interrompidas
+    await resetStalePublishing();
+
     const pendingItems = await getPendingPublications();
     const retryItems = await getFailedRetries();
     const allItems = [...pendingItems, ...retryItems];
@@ -428,25 +432,42 @@ export async function GET(request: NextRequest) {
 
       await updatePublicationQueue(item.id, { status: "publishing" });
 
-      const result = await publishToPlatform(item);
+      // Falha isolada: um item problemático não pode derrubar a execução inteira
+      // nem deixar o item preso em "publishing".
+      try {
+        const result = await publishToPlatform(item);
 
-      if (result.success) {
-        await markAsPublished(item.id, result.external_post_id || "manual");
-        results.push({
-          id: item.id,
-          platform: item.platform,
-          title: item.title,
-          action: "published",
-          external_post_id: result.external_post_id,
-        });
-      } else {
-        await markAsFailed(item.id, result.error || "Erro desconhecido");
+        if (result.success) {
+          await markAsPublished(item.id, result.external_post_id || "manual");
+          results.push({
+            id: item.id,
+            platform: item.platform,
+            title: item.title,
+            action: "published",
+            external_post_id: result.external_post_id,
+          });
+        } else {
+          await markAsFailed(item.id, result.error || "Erro desconhecido");
+          results.push({
+            id: item.id,
+            platform: item.platform,
+            title: item.title,
+            action: "failed",
+            error: result.error,
+          });
+        }
+      } catch (itemError: any) {
+        try {
+          await markAsFailed(item.id, `Erro interno: ${itemError.message}`);
+        } catch {
+          await updatePublicationQueue(item.id, { status: "scheduled" });
+        }
         results.push({
           id: item.id,
           platform: item.platform,
           title: item.title,
           action: "failed",
-          error: result.error,
+          error: itemError.message,
         });
       }
     }

@@ -850,7 +850,9 @@ export async function updatePublicationQueue(id: number, data: Partial<{ status:
   const allowed = ["status", "published_at", "external_post_id", "error_message", "retry_count", "scheduled_at"];
   const updates: string[] = [];
   const values: any[] = [];
-  Object.entries(data).forEach(([key, value]) => { if (allowed.includes(key)) { updates.push(`${key} = ?`); values.push(value); } });
+  // Ignora undefined: o libsql rejeita valores de tipo inválido ("Unsupported type of value").
+  // null é permitido (limpa a coluna).
+  Object.entries(data).forEach(([key, value]) => { if (allowed.includes(key) && value !== undefined) { updates.push(`${key} = ?`); values.push(value); } });
   if (updates.length === 0) return;
   updates.push("updated_at = CURRENT_TIMESTAMP");
   values.push(id);
@@ -866,7 +868,7 @@ export async function getFailedRetries(): Promise<PublicationItem[]> {
 }
 
 export async function markAsPublished(id: number, externalPostId: string) {
-  await updatePublicationQueue(id, { status: "published", published_at: new Date().toISOString(), external_post_id: externalPostId, error_message: undefined });
+  await updatePublicationQueue(id, { status: "published", published_at: new Date().toISOString(), external_post_id: externalPostId, error_message: null as any });
 }
 
 export async function markAsFailed(id: number, error: string) {
@@ -875,6 +877,12 @@ export async function markAsFailed(id: number, error: string) {
   const newRetryCount = item.retry_count + 1;
   const nextRetry = newRetryCount < item.max_retries ? new Date(Date.now() + Math.pow(2, newRetryCount) * 60 * 60 * 1000).toISOString() : null;
   await updatePublicationQueue(id, { status: newRetryCount >= item.max_retries ? "failed" : "scheduled", error_message: error, retry_count: newRetryCount, scheduled_at: nextRetry || undefined });
+}
+
+// Recoloca na fila itens que ficaram presos em "publishing" por uma execução
+// interrompida (o cron pode falhar no meio da publicação).
+export async function resetStalePublishing() {
+  await runExec("UPDATE publication_queue SET status = 'scheduled', updated_at = CURRENT_TIMESTAMP WHERE status = 'publishing'");
 }
 
 export async function deletePublicationQueueItem(id: number) {
