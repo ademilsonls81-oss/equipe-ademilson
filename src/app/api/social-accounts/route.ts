@@ -54,7 +54,8 @@ const OAUTH_CONFIGS: Record<string, {
     auth_url: "https://www.reddit.com/api/v1/authorize",
     client_id_env: "REDDIT_CLIENT_ID",
     scopes: ["identity", "submit"],
-    extra_params: { duration: "permanent", state: "equipe_ademilson" },
+    // duration=permanent → o Reddit devolve refresh_token (renovação automática)
+    extra_params: { duration: "permanent" },
   },
 };
 
@@ -72,13 +73,15 @@ function getOAuthUrl(platform: string, nonce: string): string | null {
   const redirectUri = `${BASE_URL}/api/social-accounts/callback`;
   console.log(`[OAUTH URL] platform=${platform} redirect_uri="${redirectUri}" base_url="${BASE_URL}"`);
   
+  // extra_params ANTES de state: parâmetros fixos (ex.: duration do Reddit)
+  // nunca podem sobrescrever o state com o nonce, senão o callback rejeita.
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: config.scopes.join(" "),
     response_type: "code",
-    state: `${platform}:${nonce}`,
     ...(config.extra_params || {}),
+    state: `${platform}:${nonce}`,
   });
 
   // Google needs access_type=offline for refresh token
@@ -545,20 +548,21 @@ function getSetupInstructions(platform: string): { title: string; steps: string[
     reddit: {
       title: "Reddit — Conta Oficial Equipe Ademilson",
       steps: [
-        "1. Acesse reddit.com/prefs/apps",
-        "2. Clique em 'create another app'",
-        "3. Tipo: 'web app'",
-        "4. Redirect URI: " + BASE_URL + "/api/social-accounts/callback",
-        "5. Copie o Client ID e Client Secret",
-        "6. Configure as Environment Variables no Vercel",
-        "7. Volte ao painel e clique em 'Conectar Reddit'",
-        "8. Autorize a aplicação",
+        "1. Crie/entre na conta Reddit que vai publicar (ex.: u/EquipeAdemilson)",
+        "2. No desktop, acesse https://www.reddit.com/prefs/apps",
+        "3. Clique em 'create another app' (nome: Equipe Ademilson)",
+        "4. Tipo: 'web app'",
+        "5. Redirect URI exato: " + BASE_URL + "/api/social-accounts/callback",
+        "6. Salve — embaixo do nome do app aparece o Client ID (string alfanumérica) e o 'secret'",
+        "7. No Vercel adicione: REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET e REDDIT_SUBREDDIT (ex.: r/beermoney)",
+        "8. Volte ao painel e clique em 'Conectar Reddit' → autorize a aplicação",
       ],
-      env_vars: ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"],
+      env_vars: ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_SUBREDDIT"],
       notes: [
-        "Crie uma conta u/EquipeAdemilson no Reddit primeiro",
-        "Respeite as regras de spam do Reddit (máx 1 post por 10 min)",
-        "Participe de subreddits relevantes antes de postar",
+        "Conta nova precisa de karma e idade mínima antes de poder postar na maioria dos subreddits",
+        "O sistema respeita o limite do Reddit: máx 1 post a cada 10 min (espera automática)",
+        "Escolha subreddits onde a conta tenha permissão de criar tópicos (regras de cada comunidade)",
+        "Respeite as regras de autopromoção do Reddit para não ser banido",
       ],
     },
   };

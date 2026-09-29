@@ -885,6 +885,16 @@ export async function resetStalePublishing() {
   await runExec("UPDATE publication_queue SET status = 'scheduled', updated_at = CURRENT_TIMESTAMP WHERE status = 'publishing'");
 }
 
+// Data/hora da última publicação confirmada de uma plataforma.
+// Usado para respeitar rate limits (Reddit: máx 1 post a cada 10 min).
+export async function getLastPublishedAt(platform: string): Promise<string | null> {
+  const row = await runGet(
+    "SELECT published_at FROM publication_queue WHERE platform = ? AND status = 'published' AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 1",
+    [platform]
+  );
+  return row?.published_at || null;
+}
+
 export async function deletePublicationQueueItem(id: number) {
   await runExec("DELETE FROM publication_queue WHERE id = ?", [id]);
 }

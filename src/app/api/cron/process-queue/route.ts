@@ -12,10 +12,12 @@ import {
   createAgentLog,
   getPlatformConfig,
   getSocialAccounts,
+  updateSocialAccount,
   checkPlatformDailyLimit,
   isDuplicatePublication,
+  getLastPublishedAt,
 } from "@/lib/db";
-import { decryptToken } from "@/lib/crypto";
+import { decryptToken, encryptToken } from "@/lib/crypto";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -345,44 +347,118 @@ async function publishToPinterest(item: any, config: any): Promise<{ success: bo
   }
 }
 
+// Reddit — usa o access token salvo pelo OAuth (o código antigo tratava o token
+// como se fosse um "authorization code" e usava o client secret como nome do
+// subreddit, o que nunca poderia funcionar).
 async function publishToReddit(item: any, config: any): Promise<{ success: boolean; external_post_id?: string; error?: string }> {
-  if (!config.api_key || !config.api_secret || !config.api_token) {
-    return { success: false, error: "Reddit API credentials não configuradas." };
+  const clientId = process.env.REDDIT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+
+  if (!config.api_token) {
+    return { success: false, error: "Conta Reddit não conectada. Conecte em Conectar Redes (OAuth)." };
   }
 
+  const subreddit = (process.env.REDDIT_SUBREDDIT || (await getAgentConfig("reddit_subreddit")) || "")
+    .trim()
+    .replace(/^\/?r\//i, "");
+  if (!subreddit) {
+    return {
+      success: false,
+      error: "REDDIT_SUBREDDIT não definido. Adicione REDDIT_SUBREDDIT no Vercel (ex.: r/beermoney) para informar onde publicar.",
+    };
+  }
+
+  // Rate limit do Reddit: máx. 1 post a cada 10 min. Se o intervalo não foi
+  // respeitado, falha com mensagem clara — o retry automático tenta mais tarde.
+  const lastPublished = await getLastPublishedAt("reddit");
+  if (lastPublished) {
+    const minsSince = (Date.now() - new Date(lastPublished).getTime()) / 60000;
+    if (minsSince < 10) {
+      return {
+        success: false,
+        error: `Reddit: aguardando intervalo mínimo de 10 min entre posts (último há ${Math.max(1, Math.floor(minsSince))} min). Reagendado automaticamente.`,
+      };
+    }
+  }
+
+  // User-Agent identificativo é OBRIGATÓRIO — o Reddit bloqueia chamadas genéricas.
+  const userAgent = "web:equipe-ademilson:v1.0 (by /u/EquipeAdemilson)";
+  const title = item.title.slice(0, 300); // limite do Reddit
+  const link = item.destination_url || "";
+  const text = link && !String(item.content || "").includes(link) ? `${item.content}\n\n${link}` : item.content;
+
+  const submit = async (token: string) =>
+    fetch("https://oauth.reddit.com/api/submit", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": userAgent,
+      },
+      body: new URLSearchParams({
+        api_type: "json",
+        sr: subreddit,
+        kind: "self",
+        title,
+        text,
+      }).toString(),
+    });
+
   try {
-    const tokenResponse = await fetch("https://www.reddit.com/api/v1/access_token", {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${config.api_key}:${config.api_secret}`).toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: `grant_type=authorization_code&code=${config.api_token}`,
-    });
+    let accessToken = config.api_token;
+    let response = await submit(accessToken);
 
-    if (!tokenResponse.ok) {
-      return { success: false, error: "Erro ao autenticar no Reddit." };
+    // Access token expirado → renova com o refresh token (OAuth duration=permanent)
+    if (response.status === 401 && clientId && clientSecret && config.api_secret) {
+      const refreshResponse = await fetch("https://www.reddit.com/api/v1/access_token", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": userAgent,
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: config.api_secret,
+        }).toString(),
+      });
+      const refreshData = await refreshResponse.json().catch(() => null);
+      if (refreshResponse.ok && refreshData?.access_token) {
+        accessToken = refreshData.access_token;
+        response = await submit(accessToken);
+        // Persiste o token renovado para as próximas publicações
+        try {
+          const accounts = await getSocialAccounts("reddit");
+          const account = accounts.find((a: any) => a && a.status === "connected");
+          if (account) {
+            await updateSocialAccount(account.id, {
+              access_token: encryptToken(accessToken),
+              expires_at: refreshData.expires_in
+                ? new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+                : undefined,
+            });
+          }
+        } catch {
+          // persistência é best-effort — não bloqueia a publicação
+        }
+      }
     }
 
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
+    const data = await response.json().catch(() => null);
+    const errors = data?.json?.errors;
 
-    const response = await fetch("https://oauth.reddit.com/api/submit", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: `sr=${config.api_secret}&kind=self&title=${encodeURIComponent(item.title)}&text=${encodeURIComponent(item.content)}`,
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      return { success: false, error: `Reddit API error: ${err}` };
+    // O Reddit responde HTTP 200 mesmo com erro — conferir data.json.errors.
+    if (!response.ok || (Array.isArray(errors) && errors.length > 0)) {
+      const detail =
+        Array.isArray(errors) && errors.length > 0
+          ? errors.map((e: any) => `${e[0]}: ${e[1]}`).join("; ")
+          : `HTTP ${response.status}`;
+      return { success: false, error: `Reddit API error no subreddit r/${subreddit}: ${detail}` };
     }
 
-    const data = await response.json();
-    return { success: true, external_post_id: data.id };
+    const created = data?.json?.data?.things?.[0]?.data;
+    const externalPostId = created?.name || created?.id || "reddit";
+    return { success: true, external_post_id: externalPostId };
   } catch (error: any) {
     return { success: false, error: `Erro ao publicar no Reddit: ${error.message}` };
   }
