@@ -2,23 +2,19 @@
   "crons": [
     {
       "path": "/api/cron/daily-content",
-      "schedule": "0 11 * * *",
-      "comment": "Gera conteúdo diário às 08h BRT (11h UTC)"
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/cron/process-queue",
-      "schedule": "45 11 * * *",
-      "comment": "Processa fila de publicações 1x/dia às 08h45 BRT (11h45 UTC), logo após a geração de conteúdo (limite Hobby da Vercel: cron diário)"
+      "schedule": "45 11 * * *"
     },
     {
       "path": "/api/cron/weekly-plan",
-      "schedule": "0 10 * * 0",
-      "comment": "Gera plano semanal todo Domingo às 07h BRT (10h UTC)"
+      "schedule": "0 10 * * 0"
     },
     {
       "path": "/api/cron/health-check",
-      "schedule": "0 12 * * *",
-      "comment": "Health check diário às 09h BRT (12h UTC)"
+      "schedule": "0 12 * * *"
     }
   ]
 }
