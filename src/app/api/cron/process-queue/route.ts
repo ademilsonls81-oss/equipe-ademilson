@@ -75,6 +75,9 @@ async function publishToPlatform(item: any): Promise<{ success: boolean; externa
       case "youtube":
         result = await publishToYouTube(item, liveConfig);
         break;
+      case "google":
+        result = await publishToGoogleBusiness(item, liveConfig);
+        break;
       case "tiktok":
         result = await publishToTikTok(item, liveConfig);
         break;
@@ -168,6 +171,15 @@ async function publishToTikTok(item: any, config: any): Promise<{ success: boole
   }
 }
 
+// Imagem das publicações com mídia: usa media_url do item ou gera PNG via /social-image
+function buildSocialImage(item: any): string {
+  if (item.media_url) return item.media_url;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
+  return `${siteUrl}/social-image?title=${encodeURIComponent(String(item.title || "").slice(0, 90))}&text=${encodeURIComponent(
+    String(item.content || "").replace(/\s+/g, " ").slice(0, 140)
+  )}`;
+}
+
 // Token usado na Graph API do Instagram: prefere o usuário Facebook (escopos
 // instagram_basic + instagram_content_publish); usa o token IGA como fallback.
 async function getInstagramAccessToken(): Promise<string | null> {
@@ -204,13 +216,7 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
     const target = igConnected?.account_id || "me";
 
     // A Graph API exige imagem raster (JPEG/PNG) publicamente acessível.
-    // Usa media_url do item ou gera uma imagem via /social-image.
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
-    const imageUrl =
-      item.media_url ||
-      `${siteUrl}/social-image?title=${encodeURIComponent(item.title.slice(0, 90))}&text=${encodeURIComponent(
-        (item.content || "").replace(/\s+/g, " ").slice(0, 140)
-      )}`;
+    const imageUrl = buildSocialImage(item);
 
     // Step 1: Create media container
     const containerResponse = await fetch(
@@ -350,6 +356,232 @@ async function publishToPinterest(item: any, config: any): Promise<{ success: bo
 // Reddit — usa o access token salvo pelo OAuth (o código antigo tratava o token
 // como se fosse um "authorization code" e usava o client secret como nome do
 // subreddit, o que nunca poderia funcionar).
+// ==================== Google Business Profile ====================
+// Publica "Atualizações" no Perfil da Empresa (Busca/Mapa do Google).
+// Regras exigidas: só empresas onde a conta autenticada é OWNER/CO-OWNER/MANAGER,
+// rate limiting (intervalo mínimo + limite diário), validação de conteúdo e
+// OAuth 2.0 com renovação automática de access token (expira em 1h).
+
+const GOOGLE_ALLOWED_ROLES = ["OWNER", "CO_OWNER", "MANAGER"];
+const GBP_ACCOUNTS_URL = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts";
+const GBP_LOCATIONS_URL = "https://mybusinessbusinessinformation.googleapis.com/v1/locations";
+const GBP_POSTS_BASE = "https://mybusiness.googleapis.com/v4";
+
+// Renova o access token Google via refresh token salvo no OAuth (dura 1h).
+async function refreshGoogleToken(config: any): Promise<string | null> {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret || !config.api_secret) return null;
+  try {
+    const r = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: config.api_secret,
+        grant_type: "refresh_token",
+      }).toString(),
+    });
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d?.access_token) return null;
+    // Persiste o token renovado para as próximas execuções
+    try {
+      const accounts = await getSocialAccounts("google");
+      const account = accounts.find((a: any) => a && a.status === "connected");
+      if (account) {
+        await updateSocialAccount(account.id, {
+          access_token: encryptToken(d.access_token),
+          expires_at: d.expires_in ? new Date(Date.now() + d.expires_in * 1000).toISOString() : undefined,
+        });
+      }
+    } catch {
+      // persistência é best-effort
+    }
+    return d.access_token;
+  } catch {
+    return null;
+  }
+}
+
+// Valida o conteúdo antes de enviar ao Google (política de posts + limites).
+function validateGooglePost(item: any): { ok: true; summary: string } | { ok: false; error: string } {
+  const summary = `${item.title || ""}\n\n${item.content || ""}`.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  if (summary.length < 20) {
+    return { ok: false, error: "Conteúdo rejeitado no Google: texto muito curto (mínimo 20 caracteres)." };
+  }
+  if (summary.length > 1500) {
+    return { ok: false, error: `Conteúdo rejeitado no Google: ${summary.length} caracteres (máximo 1500).` };
+  }
+  const hashtags = (summary.match(/#\w+/g) || []).length;
+  if (hashtags > 4) {
+    return { ok: false, error: `Conteúdo rejeitado no Google: ${hashtags} hashtags (máximo 4).` };
+  }
+  if (!/[a-zA-ZÀ-ÿ]{3}/.test(summary)) {
+    return { ok: false, error: "Conteúdo rejeitado no Google: sem texto significativo." };
+  }
+  return { ok: true, summary };
+}
+
+async function publishToGoogleBusiness(item: any, config: any): Promise<{ success: boolean; external_post_id?: string; error?: string }> {
+  if (!config.api_token) {
+    return { success: false, error: "Conta Google (Perfil da Empresa) não conectada. Conecte em Conectar Redes." };
+  }
+
+  // 1) Validação de conteúdo
+  const content = validateGooglePost(item);
+  if (!content.ok) return { success: false, error: content.error };
+
+  // 2) Rate limiting: intervalo mínimo entre publicações
+  const minIntervalMin = Number(process.env.GOOGLE_POST_MIN_INTERVAL_MIN || "60");
+  const lastPublished = await getLastPublishedAt("google");
+  if (lastPublished) {
+    const minsSince = (Date.now() - new Date(lastPublished).getTime()) / 60000;
+    if (minsSince < minIntervalMin) {
+      return {
+        success: false,
+        error: `Google: aguardando intervalo mínimo de ${minIntervalMin} min entre posts (último há ${Math.floor(minsSince)} min). Reagendado automaticamente.`,
+      };
+    }
+  }
+
+  let token = config.api_token;
+
+  // 3) Contas de negócio acessíveis com este token
+  let accountsResponse = await fetch(GBP_ACCOUNTS_URL, { headers: { Authorization: `Bearer ${token}` } });
+  if (accountsResponse.status === 401) {
+    const fresh = await refreshGoogleToken(config);
+    if (fresh) {
+      token = fresh;
+      accountsResponse = await fetch(GBP_ACCOUNTS_URL, { headers: { Authorization: `Bearer ${token}` } });
+    }
+  }
+  if (!accountsResponse.ok) {
+    const body = await accountsResponse.text();
+    const hint =
+      accountsResponse.status === 403
+        ? " → Verifique se a API 'Google Business Profile API' está habilitada no Cloud Console e se o escopo business.manage foi adicionado à tela de consentimento."
+        : "";
+    return { success: false, error: `Google Business Profile API: HTTP ${accountsResponse.status} ${body.slice(0, 220)}${hint}` };
+  }
+  const accounts: any[] = ((await accountsResponse.json()).accounts || []).filter((a: any) => a?.name);
+  if (!accounts.length) {
+    return { success: false, error: "Nenhuma conta do Google Business Profile acessível com esta conta Google." };
+  }
+
+  // 4) Filtro de segurança: só OWNER / CO-OWNER / MANAGER
+  const forcedAccount = (process.env.GOOGLE_BUSINESS_ACCOUNT || "").trim();
+  const roleSummary = accounts.map((a) => `${a.name}=${String(a.role || "?").toUpperCase()}`).join(", ");
+  let eligible = accounts.filter((a) => GOOGLE_ALLOWED_ROLES.includes(String(a.role || "").toUpperCase()));
+  if (forcedAccount) {
+    const forced = accounts.find((a) => a.name === forcedAccount);
+    if (!forced) {
+      return { success: false, error: `Conta ${forcedAccount} não está entre as contas acessíveis (${roleSummary}).` };
+    }
+    if (!GOOGLE_ALLOWED_ROLES.includes(String(forced.role || "").toUpperCase())) {
+      return {
+        success: false,
+        error: `Bloqueado por segurança: papel '${String(forced.role || "desconhecido").toUpperCase()}' não é OWNER/CO-OWNER/MANAGER em ${forcedAccount}.`,
+      };
+    }
+    eligible = [forced];
+  }
+  if (!eligible.length) {
+    return {
+      success: false,
+      error: `Nenhuma conta com papel OWNER/CO-OWNER/MANAGER (vistas: ${roleSummary}). Conecte a conta que é dona ou administradora do perfil.`,
+    };
+  }
+
+  // 5) Localizações (empresas) das contas elegíveis
+  const maxLocations = Number(process.env.GOOGLE_MAX_LOCATIONS || "10");
+  const wanted = (process.env.GOOGLE_BUSINESS_LOCATIONS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const locations: any[] = [];
+  const listErrors: string[] = [];
+  for (const account of eligible) {
+    if (locations.length >= maxLocations) break;
+    const lr = await fetch(
+      `${GBP_LOCATIONS_URL}?parent=${encodeURIComponent(account.name)}&pageSize=${maxLocations}&readMask=name,title,languageCode`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!lr.ok) {
+      listErrors.push(`${account.name}: HTTP ${lr.status} ${(await lr.text()).slice(0, 140)}`);
+      continue;
+    }
+    const ld = await lr.json().catch(() => ({}));
+    for (const loc of ld.locations || []) locations.push(loc);
+  }
+  if (!locations.length) {
+    return {
+      success: false,
+      error: `Nenhuma localização (empresa) encontrada${listErrors.length ? ` → ${listErrors.join(" | ")}` : ` nas contas: ${eligible.map((a) => a.name).join(", ")}`}`,
+    };
+  }
+
+  // 6) Seleção alvo (opcional: GOOGLE_BUSINESS_LOCATIONS = nomes/códigos separados por vírgula)
+  let targets = locations;
+  if (wanted.length) {
+    targets = locations.filter(
+      (l) => wanted.includes(l.name) || wanted.includes(String(l.storeCode || "")) || wanted.includes(String(l.placeId || ""))
+    );
+    if (!targets.length) {
+      return { success: false, error: `GOOGLE_BUSINESS_LOCATIONS não corresponde a nenhuma localização acessível (${locations.length} disponíveis).` };
+    }
+  }
+  targets = targets.slice(0, maxLocations);
+
+  // 7) Publicar em cada empresa alvo
+  const imageUrl = buildSocialImage(item);
+  const published: string[] = [];
+  const failed: string[] = [];
+  for (const location of targets) {
+    const body: any = {
+      languageCode: location.languageCode || "pt-BR",
+      summary: content.summary,
+      topicType: "STANDARD",
+    };
+    if (item.destination_url) {
+      body.callToAction = { actionType: "LEARN_MORE", url: item.destination_url };
+    }
+    if (imageUrl) {
+      body.media = [{ mediaFormat: "PHOTO", sourceUrl: imageUrl }];
+    }
+
+    const send = () =>
+      fetch(`${GBP_POSTS_BASE}/${location.name}/localPosts`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    let response = await send();
+    if (response.status === 401) {
+      const fresh = await refreshGoogleToken(config);
+      if (fresh) {
+        token = fresh;
+        response = await send();
+      }
+    }
+
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      published.push(data?.name || location.name);
+    } else {
+      const errBody = await response.text();
+      failed.push(`${location.title || location.name}: HTTP ${response.status} ${errBody.slice(0, 160)}`);
+    }
+  }
+
+  if (!published.length) {
+    return { success: false, error: `Google: falhou em ${failed.length}/${targets.length} empresa(s) → ${failed.slice(0, 3).join(" | ")}` };
+  }
+  const note = failed.length ? ` (${published.length}/${targets.length} empresas — falhas: ${failed.slice(0, 2).join("; ")})` : "";
+  return { success: true, external_post_id: `${published[0]}${note}` };
+}
+
 async function publishToReddit(item: any, config: any): Promise<{ success: boolean; external_post_id?: string; error?: string }> {
   const clientId = process.env.REDDIT_CLIENT_ID;
   const clientSecret = process.env.REDDIT_CLIENT_SECRET;

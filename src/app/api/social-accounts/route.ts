@@ -29,6 +29,14 @@ const OAUTH_CONFIGS: Record<string, {
     client_id_env: "GOOGLE_CLIENT_ID",
     scopes: ["https://www.googleapis.com/auth/youtube", "https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/userinfo.profile"],
   },
+  // Google Business Profile — publica "Atualizações" no Perfil da Empresa
+  // (Busca/Mapa). Requer API "Google Business Profile API" habilitada e o
+  // escopo business.manage na tela de consentimento OAuth.
+  google: {
+    auth_url: "https://accounts.google.com/o/oauth2/v2/auth",
+    client_id_env: "GOOGLE_CLIENT_ID",
+    scopes: ["https://www.googleapis.com/auth/business.manage"],
+  },
   instagram: {
     auth_url: "https://www.instagram.com/oauth/authorize",
     client_id_env: "INSTAGRAM_CLIENT_ID",
@@ -84,8 +92,9 @@ function getOAuthUrl(platform: string, nonce: string): string | null {
     state: `${platform}:${nonce}`,
   });
 
-  // Google needs access_type=offline for refresh token
-  if (platform === "youtube") {
+  // Google precisa de access_type=offline para devolver refresh token
+  // (access token expira em 1h) e prompt=consent garante o refresh_token
+  if (platform === "youtube" || platform === "google") {
     params.set("access_type", "offline");
     params.set("prompt", "consent");
   }
@@ -465,6 +474,27 @@ function getSetupInstructions(platform: string): { title: string; steps: string[
         "Crie uma conta de serviço do YouTube para o projeto (não use conta pessoal)",
         "Para publicar vídeos, você precisa de uma conta verificada",
         "O OAuth retorna refresh_token para publicações automáticas",
+      ],
+    },
+    google: {
+      title: "Google (Perfil da Empresa) — Posts na Busca e no Mapa",
+      steps: [
+        "1. Acesse console.cloud.google.com → selecione o projeto do GOOGLE_CLIENT_ID",
+        "2. 'APIs e serviços' → 'Biblioteca' → busque 'Google Business Profile API' → Habilitar",
+        "3. 'APIs e serviços' → 'Tela de consentimento OAuth' → 'Escopos adicionados' → 'Adicionar escopos'",
+        "4. Busque e adicione: 'Gerenciar negócios' (business.manage) → Salvar",
+        "5. Se o app estiver em modo 'Teste': em 'Usuários de teste' adicione o e-mail da conta dona do perfil",
+        "6. Garanta que a conta Google que vai conectar seja PROPRIETÁRIA ou ADMINISTRADORA do Perfil da Empresa (business.google.com)",
+        "7. Volte ao painel e clique em 'Conectar Google (Perfil da Empresa)' → autorize",
+        "8. Opcional no Vercel: GOOGLE_BUSINESS_ACCOUNT, GOOGLE_BUSINESS_LOCATIONS, GOOGLE_POST_MIN_INTERVAL_MIN, GOOGLE_MAX_LOCATIONS",
+      ],
+      env_vars: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_BUSINESS_LOCATIONS (opcional)"],
+      notes: [
+        "Segurança: só publica em empresas onde o papel da conta é OWNER/CO-OWNER/MANAGER",
+        "Rate limiting: intervalo mínimo entre posts (padrão 60 min) + limite diário da plataforma",
+        "O Perfil da Empresa precisa estar VERIFICADO — posts de perfil não verificado ficam 'Pendente'",
+        "Cada post passa pela revisão automática do Google antes de aparecer na Busca/Mapa",
+        "O botão do post (LEARN_MORE) leva para o site com UTM de origem google",
       ],
     },
     instagram: {

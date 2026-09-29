@@ -11,8 +11,12 @@ import { validateNonce } from "@/lib/oauth-nonce";
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
 
+// Google Business Profile
+const GBP_LOCATIONS_URL = "https://mybusinessbusinessinformation.googleapis.com/v1/locations";
+
 const TOKEN_URLS: Record<string, string> = {
   youtube: "https://oauth2.googleapis.com/token",
+  google: "https://oauth2.googleapis.com/token",
   instagram: "https://api.instagram.com/oauth/access_token",
   facebook: "https://graph.facebook.com/v19.0/oauth/access_token",
   tiktok: "https://open.tiktokapis.com/v2/oauth/token/",
@@ -23,6 +27,11 @@ const TOKEN_URLS: Record<string, string> = {
 const INFO_URLS: Record<string, (token: string) => { url: string; headers?: Record<string, string> }> = {
   youtube: (token) => ({
     url: "https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true",
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  // Google Business Profile: lista as contas de negócio acessíveis
+  google: (token) => ({
+    url: "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
     headers: { Authorization: `Bearer ${token}` },
   }),
   instagram: (token) => ({
@@ -218,6 +227,7 @@ async function exchangeCodeForToken(
 
   switch (platform) {
     case "youtube":
+    case "google":
     case "facebook": {
       const params = new URLSearchParams({
         code,
@@ -343,6 +353,24 @@ async function fetchAccountInfo(platform: string, token: string): Promise<{ id?:
         const ch = d.items?.[0];
         return { id: ch?.id, name: ch?.snippet?.title, avatar: ch?.snippet?.thumbnails?.default?.url };
       }
+      case "google": {
+        // O primeiro account name ("accounts/123") é estável → identidade da conta.
+        // O nome exibido vem do título da primeira localização (empresa).
+        const acc = (d.accounts || [])[0];
+        if (!acc) return null;
+        let businessName = acc.name;
+        try {
+          const lr = await fetch(
+            `${GBP_LOCATIONS_URL}?parent=${encodeURIComponent(acc.name)}&pageSize=1&readMask=name,title,languageCode`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const ld = await lr.json();
+          if (ld.locations?.[0]?.title) businessName = ld.locations[0].title;
+        } catch {
+          // sem título — usa o id da conta
+        }
+        return { id: acc.name, name: businessName };
+      }
       case "instagram":
         return { id: d.id, name: d.username };
       case "facebook":
@@ -363,6 +391,7 @@ async function fetchAccountInfo(platform: string, token: string): Promise<{ id?:
 function getClientIdKey(platform: string): string {
   const map: Record<string, string> = {
     youtube: "GOOGLE_CLIENT_ID",
+    google: "GOOGLE_CLIENT_ID",
     instagram: "INSTAGRAM_CLIENT_ID",
     facebook: "FACEBOOK_CLIENT_ID",
     tiktok: "TIKTOK_CLIENT_KEY",
@@ -375,6 +404,7 @@ function getClientIdKey(platform: string): string {
 function getClientSecretKey(platform: string): string {
   const map: Record<string, string> = {
     youtube: "GOOGLE_CLIENT_SECRET",
+    google: "GOOGLE_CLIENT_SECRET",
     instagram: "INSTAGRAM_CLIENT_SECRET",
     facebook: "FACEBOOK_CLIENT_SECRET",
     tiktok: "TIKTOK_CLIENT_SECRET",

@@ -1045,7 +1045,7 @@ export async function deleteSocialAccount(id: number) {
 }
 
 export async function getSocialConnectionStatus() {
-  const platforms = ["youtube", "instagram", "facebook", "tiktok", "pinterest", "reddit"];
+  const platforms = ["youtube", "google", "instagram", "facebook", "tiktok", "pinterest", "reddit"];
   const result = [];
   for (const platform of platforms) {
     const accounts = await runAll("SELECT id, account_name, status, connected_at, avatar_url FROM social_accounts WHERE platform = ? AND status = 'connected'", [platform]);
