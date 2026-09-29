@@ -239,9 +239,15 @@ async function publishToFacebook(item: any, config: any): Promise<{ success: boo
       pageId = page.id;
       pageToken = page.access_token;
     } else {
-      // Fallback: usar token do usuário (funciona para timelines pessoais)
-      pageId = "me";
-      pageToken = config.api_token;
+      // Sem Página vinculada ao app: postar na timeline pessoal exige permissões
+      // extras e normalmente falha com erro #200. Falha rápida com instrução clara.
+      const fbError = pagesData?.error?.message;
+      return {
+        success: false,
+        error: `Nenhuma Página do Facebook está visível para o app (${fbError || "/me/accounts vazio"}). ` +
+          `No Developer Console do app, adicione a Página "Equipe Ademilson" em Configurações → Básico → ` +
+          `Ativos de Negócio (ou vincule a Página ao app) e reconecte a conta em Conectar Redes.`,
+      };
     }
 
     const message = `${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`;
