@@ -7,8 +7,8 @@
     },
     {
       "path": "/api/cron/process-queue",
-      "schedule": "*/15 * * * *",
-      "comment": "Processa fila de publicações a cada 15 minutos"
+      "schedule": "45 11 * * *",
+      "comment": "Processa fila de publicações 1x/dia às 08h45 BRT (11h45 UTC), logo após a geração de conteúdo (limite Hobby da Vercel: cron diário)"
     },
     {
       "path": "/api/cron/weekly-plan",
