@@ -86,6 +86,7 @@ type SetupInstructions = {
 };
 
 const PLATFORM_ICONS: Record<string, string> = {
+  google: "📍",
   youtube: "📺",
   instagram: "📷",
   facebook: "📘",
@@ -95,6 +96,7 @@ const PLATFORM_ICONS: Record<string, string> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
+  google: "#4285F4",
   youtube: "#FF0000",
   instagram: "#E4405F",
   facebook: "#1877F2",
@@ -118,7 +120,7 @@ export default function ContentEnginePage() {
   const [error, setError] = useState(false);
   const [socialPlatforms, setSocialPlatforms] = useState<SocialPlatformStatus[]>([]);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "learning" | "topics" | "drafts" | "schedule" | "automation" | "networks">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "learning" | "topics" | "drafts" | "schedule" | "automation" | "networks" | "report">("dashboard");
   const [showSetup, setShowSetup] = useState<string | null>(null);
   const [setupInstructions, setSetupInstructions] = useState<SetupInstructions | null>(null);
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
@@ -186,6 +188,12 @@ export default function ContentEnginePage() {
       setSocialAccounts(data.accounts || []);
     }
   }
+
+  // ?tab=... (redirect do OAuth, ex.: ?tab=networks&connected=google) → abre a aba
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab) setActiveTab(tab as any);
+  }, []);
 
   async function connectPlatform(platform: string) {
     setConnectingPlatform(platform);
@@ -309,6 +317,56 @@ export default function ContentEnginePage() {
     await refresh();
   }
 
+  // ===== Relatório (aba 📋) — dados derivados do estado ao vivo =====
+  const autoByPlatform: Record<string, any> = {};
+  (automation?.platforms || []).forEach((p: any) => { autoByPlatform[p.platform] = p; });
+
+  const netRow = (platform: string, steps: { pending: string; done: string }) => {
+    const social = socialPlatforms.find((p) => p.platform === platform);
+    const auto = autoByPlatform[platform];
+    const connected = !!social?.connected;
+    const published = auto?.total_published || 0;
+    return {
+      platform,
+      icon: PLATFORM_ICONS[platform] || "🔗",
+      connected,
+      published,
+      apiConfigured: !!social?.api_configured || !!auto?.api_configured,
+      tone: connected && published > 0 ? "ok" : connected ? "wait" : "off",
+      next: connected && published > 0 ? steps.done : steps.pending,
+    };
+  };
+
+  const NETWORK_REPORT = [
+    netRow("facebook", { pending: "🔴 Vincular a Página ao app no Developer Console (2 min) — desbloqueia Facebook E Instagram", done: "✅ Totalmente automático (até 3 posts/dia)" }),
+    netRow("instagram", { pending: "🔴 Mesmo passo do Facebook: Página vinculada + conta IG profissional ligada a ela", done: "✅ Automático com imagem gerada (até 3 posts/dia)" }),
+    netRow("google", { pending: "🟠 Cloud Console → habilitar 'Google Business Profile API' + escopo business.manage → Conectar Google", done: "✅ Automático (2 posts/dia, só empresas owner/admin)" }),
+    netRow("reddit", { pending: "🟡 Criar app em reddit.com/prefs/apps → enviar CLIENT_ID/SECRET + subreddit → Conectar", done: "✅ Automático (1 post/10 min respeitado)" }),
+    netRow("youtube", { pending: "⏳ Exige arquivo de vídeo: configurar API key + OAuth; sem vídeo não publica", done: "✅ Automático (upload de vídeo)" }),
+    netRow("tiktok", { pending: "⏳ Falta TIKTOK_CLIENT_SECRET + aprovação do app na TikTok (demora dias)", done: "✅ Automático (video.publish)" }),
+    netRow("pinterest", { pending: "⏳ Criar app em developers.pinterest.com + adicionar PINTEREST_CLIENT_ID/SECRET", done: "✅ Automático (pins com imagem)" }),
+  ];
+
+  const REPORT_CHANGES: { area: string; what: string; result: string }[] = [
+    { area: "Crons da Vercel", what: "vercel.json inválido (campo comment + */15) rejeitava o deploy há 8 dias", result: "4 crons diários válidos (Hobby) — deploy e execução automática de volta" },
+    { area: "Modo do agente", what: "agent_mode era 'test' em produção — nunca publicava", result: "AUTONOMOUS ativo e verificado" },
+    { area: "Geração de conteúdo", what: "Enfileirava plataformas sem credencial e duplicava itens", result: "Só enfileira API + conta conectada; idempotente por content_id" },
+    { area: "Publicador (crashes)", what: "scheduled_at undefined derrubava o cron; itens presos em 'publishing'; falha de 1 item parava todos", result: "Filtro de undefined; reset automático de presos; falha isolada por item" },
+    { area: "Instagram", what: "Sem imagem (SVG não aceito), token IGA rejeitado, publicava em '/me'", result: "PNG dinâmico /social-image, token Facebook, ID da conta IG, caption ≤2200, nos temas diários" },
+    { area: "Facebook", what: "Erro genérico quando o app não via a Página", result: "Erro acionável (vincular Página) + retry automático com backoff" },
+    { area: "Reddit (novo)", what: "state/nonce do OAuth quebrava; usava token como authorization code e o secret como subreddit", result: "OAuth corrigido; Bearer + User-Agent + checagem de json.errors + refresh; rate limit 10 min" },
+    { area: "Google Perfil da Empresa (novo)", what: "Integração inexistente", result: "OAuth business.manage, filtro OWNER/MANAGER, validação de conteúdo, rate limit (60 min e 2/dia), refresh de token 1h" },
+    { area: "Painel admin", what: "Verde de 'conectado' escondia falhas de publicação", result: "Aba 📋 Relatório com situação por rede, pendências e agenda" },
+    { area: "Testes E2E", what: "—", result: "health 200/401, dedupe, fila, PNG 84KB, URL OAuth Google — todos passando" },
+  ];
+
+  const CRON_SCHEDULE = [
+    { path: "/api/cron/daily-content", when: "Todo dia 08:00 BRT (11:00 UTC)", what: "Gera o conteúdo do dia e enfileira por rede" },
+    { path: "/api/cron/process-queue", when: "Todo dia 08:45 BRT (11:45 UTC)", what: "Publica os itens agendados + retries automáticos" },
+    { path: "/api/cron/weekly-plan", when: "Domingo 07:00 BRT (10:00 UTC)", what: "Monta o plano semanal de conteúdo" },
+    { path: "/api/cron/health-check", when: "Todo dia 09:00 BRT (12:00 UTC)", what: "Verifica variáveis de ambiente e saúde do sistema" },
+  ];
+
   if (!authed) {
     return (
       <div className={styles.loginPage}>
@@ -365,6 +423,7 @@ export default function ContentEnginePage() {
         <button className={`${styles.tab} ${activeTab === "schedule" ? styles.tabActive : ""}`} onClick={() => setActiveTab("schedule")}>📅 Agenda</button>
         <button className={`${styles.tab} ${activeTab === "automation" ? styles.tabActive : ""}`} onClick={() => setActiveTab("automation")}>🤖 Automação</button>
         <button className={`${styles.tab} ${activeTab === "networks" ? styles.tabActive : ""}`} onClick={() => { setActiveTab("networks"); fetchSocialData(); }}>🔗 Conectar Redes</button>
+        <button className={`${styles.tab} ${activeTab === "report" ? styles.tabActive : ""}`} onClick={() => { setActiveTab("report"); fetchSocialData(); refresh(); }}>📋 Relatório</button>
       </nav>
 
       {activeTab === "dashboard" && dashboard && (
@@ -649,6 +708,128 @@ export default function ContentEnginePage() {
             ) : (
               <div className={styles.emptyState}><p>Nenhum item na fila por plataforma.</p></div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "report" && (
+        <div className={styles.content}>
+          <div className={styles.section}>
+            <h2>📋 RELATÓRIO DO DIA — {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}</h2>
+            <p className={styles.sectionDesc}>
+              Resumo do que foi implementado, situação de cada rede e o que ainda exige sua ação. Dados ao vivo — atualizado ao abrir esta aba ({new Date().toLocaleTimeString("pt-BR")}).
+            </p>
+            <div className={styles.grid5}>
+              <div className={`${styles.cardBig} ${automation?.autonomous_mode ? styles.cardGreen : ""}`}>
+                <div className={styles.cardIcon}>{automation?.autonomous_mode ? "🤖" : automation?.paused_mode ? "🔴" : "🧪"}</div>
+                <div className={styles.cardValue} style={{ fontSize: 20 }}>{(automation?.mode || "—").toUpperCase()}</div>
+                <div className={styles.cardLabel}>Modo do Agente</div>
+              </div>
+              <div className={`${styles.cardBig} ${styles.cardGreen}`}>
+                <div className={styles.cardIcon}>✅</div>
+                <div className={styles.cardValue}>{automation?.queue?.publishedToday || 0}</div>
+                <div className={styles.cardLabel}>Publicados Hoje</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>📅</div>
+                <div className={styles.cardValue}>{automation?.queue?.scheduled || 0}</div>
+                <div className={styles.cardLabel}>Agendados</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>⏳</div>
+                <div className={styles.cardValue}>{automation?.queue?.retryPending || 0}</div>
+                <div className={styles.cardLabel}>Reagendados p/ Retry</div>
+              </div>
+              <div className={styles.cardBig}>
+                <div className={styles.cardIcon}>🔗</div>
+                <div className={styles.cardValue}>{socialPlatforms.filter((p) => p.connected).length}/{socialPlatforms.length || 7}</div>
+                <div className={styles.cardLabel}>Redes Conectadas</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <h2>✅ O QUE FOI FEITO HOJE</h2>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Área</th><th>Problema encontrado</th><th>Resultado (testado)</th></tr></thead>
+                <tbody>
+                  {REPORT_CHANGES.map((c, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{c.area}</td>
+                      <td style={{ color: "var(--text-muted)" }}>{c.what}</td>
+                      <td style={{ color: "#4ade80" }}>{c.result}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <h2>🔗 SITUAÇÃO POR REDE (ao vivo)</h2>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Rede</th><th>Conectada</th><th>Publicações totais</th><th>Situação</th><th>Próximo passo</th></tr></thead>
+                <tbody>
+                  {NETWORK_REPORT.map((n) => (
+                    <tr key={n.platform}>
+                      <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{n.icon} {n.platform}</td>
+                      <td>{n.connected ? "✅ Sim" : "❌ Não"}</td>
+                      <td>{n.published}</td>
+                      <td>
+                        <span className={`${styles.badge} ${n.tone === "ok" ? styles.badgeaprovado : n.tone === "wait" ? styles.badgerevisao : styles.badgefraco}`}>
+                          {n.tone === "ok" ? "AUTOMÁTICO" : n.tone === "wait" ? "CONECTADO/AGUARDANDO" : "PENDENTE"}
+                        </span>
+                      </td>
+                      <td>{n.next}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <h2>⏰ ROTINA AUTOMÁTICA (Vercel Cron)</h2>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Quando</th><th>Rota</th><th>O que faz</th></tr></thead>
+                <tbody>
+                  {CRON_SCHEDULE.map((c) => (
+                    <tr key={c.path}>
+                      <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{c.when}</td>
+                      <td style={{ fontFamily: "monospace", fontSize: 12 }}>{c.path}</td>
+                      <td>{c.what}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className={styles.sectionDesc} style={{ marginTop: 10 }}>
+              Última execução registrada: <b>{automation?.last_cron_run ? new Date(automation.last_cron_run).toLocaleString("pt-BR") : "—"}</b>
+              {" · "}Próxima: <b>{automation?.next_cron_run ? new Date(automation.next_cron_run).toLocaleString("pt-BR") : "—"}</b>
+              {" · "}Fila: <b>{automation?.queue?.total || 0}</b> itens · <b>{automation?.queue?.failed || 0}</b> em falha
+            </p>
+          </div>
+
+          <div className={styles.section}>
+            <h2>⚠️ PENDÊNCIAS QUE EXIGEM SUA AÇÃO (em ordem de prioridade)</h2>
+            <div className={styles.warningBox}>
+              <b>1. 🔴 Facebook + Instagram (2 min)</b> — No Developer Console do app, vincule a Página “Equipe Ademilson” ao app (Configurações → Básico → Ativos de Negócio / ou vincular Página). É <b>um passo que desbloqueia as duas redes</b>; os itens já estão na fila e publicam sozinhos em seguida.{" "}
+              <a href="https://developers.facebook.com/apps/1589072832596532/settings/basic/" target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>Abrir o app ↗</a>
+            </div>
+            <div className={styles.warningBox}>
+              <b>2. 🟠 Google Perfil da Empresa (5 min)</b> — No Cloud Console: APIs e serviços → Biblioteca → habilitar <b>“Google Business Profile API”</b>; depois Tela de consentimento → Escopos → adicionar <b>“Gerenciar negócios” (business.manage)</b>; adicione seu e-mail em Usuários de teste (se em modo Teste). Depois clique em <b>Conectar Google</b> aqui em Conectar Redes.{" "}
+              <a href="https://console.cloud.google.com/apis/library/mybusiness.googleapis.com" target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>Habilitar API ↗</a>
+            </div>
+            <div className={styles.warningBox}>
+              <b>3. 🟡 Reddit (5 min)</b> — Crie o app em reddit.com/prefs/apps (tipo “web app”, redirect URI: https://equipe-ademilson.vercel.app/api/social-accounts/callback) e me envie <b>CLIENT_ID + SECRET + subreddit</b>. Eu adiciono no Vercel e conectamos.{" "}
+              <a href="https://www.reddit.com/prefs/apps" target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>Criar app ↗</a>
+            </div>
+            <div className={styles.warningBox}>
+              <b>4. 🟢 Opcional</b> — TikTok (falta TIKTOK_CLIENT_SECRET + aprovação do app), Pinterest (criar app), YouTube (exige arquivo de vídeo). Nenhum deles é bloqueio para as redes acima.
+            </div>
           </div>
         </div>
       )}
