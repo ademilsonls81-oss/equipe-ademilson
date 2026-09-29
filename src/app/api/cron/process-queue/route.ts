@@ -171,7 +171,17 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
   }
 
   try {
-    const caption = `${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`;
+    // Limite de caption do Instagram: 2200 caracteres
+    const caption = `${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`.slice(0, 2200);
+
+    // A Graph API exige imagem raster (JPEG/PNG) publicamente acessível.
+    // Usa media_url do item ou gera uma imagem via /social-image.
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
+    const imageUrl =
+      item.media_url ||
+      `${siteUrl}/social-image?title=${encodeURIComponent(item.title.slice(0, 90))}&text=${encodeURIComponent(
+        (item.content || "").replace(/\s+/g, " ").slice(0, 140)
+      )}`;
 
     // Step 1: Create media container
     const containerResponse = await fetch(
@@ -181,6 +191,7 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           caption,
+          image_url: imageUrl,
           access_token: config.api_token,
         }).toString(),
       }

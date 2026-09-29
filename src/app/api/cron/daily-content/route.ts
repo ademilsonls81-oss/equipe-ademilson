@@ -25,7 +25,7 @@ const CONTENT_THEMES = [
   {
     theme: "Oportunidade",
     angle: "Apresentar como uma nova oportunidade de ganho",
-    platforms: ["facebook", "reddit", "whatsapp"],
+    platforms: ["facebook", "reddit", "whatsapp", "instagram"],
   },
   {
     theme: "Tutorial",
@@ -35,7 +35,7 @@ const CONTENT_THEMES = [
   {
     theme: "Prova Social",
     angle: "Mostrar resultados de quem já participa",
-    platforms: ["facebook", "whatsapp"],
+    platforms: ["facebook", "whatsapp", "instagram"],
   },
   {
     theme: "Comparação",
@@ -55,7 +55,7 @@ const CONTENT_THEMES = [
   {
     theme: "Dica Rápida",
     angle: "Dar uma dica prática e rápida",
-    platforms: ["facebook", "whatsapp"],
+    platforms: ["facebook", "whatsapp", "instagram"],
   },
 ];
 
