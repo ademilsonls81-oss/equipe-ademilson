@@ -165,9 +165,29 @@ async function publishToTikTok(item: any, config: any): Promise<{ success: boole
   }
 }
 
+// Token usado na Graph API do Instagram: prefere o usuário Facebook (escopos
+// instagram_basic + instagram_content_publish); usa o token IGA como fallback.
+async function getInstagramAccessToken(): Promise<string | null> {
+  try {
+    const fbAccounts = await getSocialAccounts("facebook");
+    const fb = fbAccounts.find((a: any) => a && a.status === "connected" && a.access_token);
+    if (fb) return decryptToken(fb.access_token);
+    const igAccounts = await getSocialAccounts("instagram");
+    const ig = igAccounts.find((a: any) => a && a.status === "connected" && a.access_token);
+    if (ig) return decryptToken(ig.access_token);
+  } catch {
+    // ignora — retorna null abaixo
+  }
+  return null;
+}
+
 async function publishToInstagram(item: any, config: any): Promise<{ success: boolean; external_post_id?: string; error?: string }> {
-  if (!config.api_token) {
-    return { success: false, error: "Instagram Graph API token não configurado." };
+  // A Graph API do Instagram (graph.facebook.com) exige token de usuário Facebook
+  // com instagram_basic + instagram_content_publish e conta IG vinculada a uma
+  // Página. O token IGA vendo do OAuth direto do Instagram não é aceito aqui.
+  const accessToken = (await getInstagramAccessToken()) || config.api_token;
+  if (!accessToken) {
+    return { success: false, error: "Nenhum token disponível para Instagram. Conecte Facebook ou Instagram em Conectar Redes." };
   }
 
   try {
@@ -192,7 +212,7 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
         body: new URLSearchParams({
           caption,
           image_url: imageUrl,
-          access_token: config.api_token,
+          access_token: accessToken,
         }).toString(),
       }
     );
@@ -213,7 +233,7 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           creation_id: mediaId,
-          access_token: config.api_token,
+          access_token: accessToken,
         }).toString(),
       }
     );
