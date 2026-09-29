@@ -4,6 +4,8 @@ import {
   setAgentConfig,
   addToPublicationQueue,
   seedPrimeiraCampanha,
+  getPlatformConfig,
+  getSocialAccounts,
 } from "@/lib/db";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -60,6 +62,24 @@ function generateUTM(platform: string, theme: string): string {
   return `utm_source=${platform}&utm_medium=social&utm_campaign=${theme.toLowerCase().replace(/\s+/g, "-")}`;
 }
 
+// Só enfileira plataformas com API configurada, habilitada e conta conectada.
+// Evita itens na fila que só gerariam falha (ex.: whatsapp sem API, reddit sem credencial).
+async function getPublishablePlatforms(platforms: string[]): Promise<string[]> {
+  const publishable: string[] = [];
+  for (const platform of platforms) {
+    try {
+      const config = await getPlatformConfig(platform) as any;
+      if (!config || !config.api_configured || !config.enabled) continue;
+      const accounts = await getSocialAccounts(platform) as any[];
+      if (!accounts.some((a) => a && a.status === "connected" && a.access_token)) continue;
+      publishable.push(platform);
+    } catch {
+      // plataforma sem tabela/config — ignora
+    }
+  }
+  return publishable;
+}
+
 function generateContent(platform: string, theme: typeof CONTENT_THEMES[0]) {
   const utm = generateUTM(platform, theme.theme);
   const url = `${SITE_URL}?${utm}`;
@@ -114,7 +134,10 @@ export async function GET(request: NextRequest) {
     const campaignId = "primeiro-100-membros";
     const addedItems: string[] = [];
 
-    for (const platform of theme.platforms) {
+    const publishable = await getPublishablePlatforms(theme.platforms);
+    const notPublishable = theme.platforms.filter((p) => !publishable.includes(p));
+
+    for (const platform of publishable) {
       const content = generateContent(platform, theme);
       const scheduledAt = new Date(today.getTime() + 30 * 60 * 1000).toISOString(); // +30min
 
@@ -139,8 +162,8 @@ export async function GET(request: NextRequest) {
     await createAgentLog({
       agent_type: "cron",
       action: "daily_content",
-      details: `Conteúdo diário gerado: tema "${theme.theme}" para ${addedItems.join(", ")}. ${addedItems.length} itens na fila.`,
-      status: "success",
+      details: `Conteúdo diário gerado: tema "${theme.theme}" para ${addedItems.join(", ") || "nenhuma plataforma"}. ${addedItems.length} itens na fila.${notPublishable.length ? ` Ignoradas (sem API/conta): ${notPublishable.join(", ")}.` : ""}`,
+      status: addedItems.length > 0 ? "success" : "warning",
     });
 
     return NextResponse.json({
@@ -149,6 +172,7 @@ export async function GET(request: NextRequest) {
       theme: theme.theme,
       angle: theme.angle,
       platforms: addedItems,
+      skipped: notPublishable,
       queued: addedItems.length,
       duration_ms: Date.now() - startTime,
     });
