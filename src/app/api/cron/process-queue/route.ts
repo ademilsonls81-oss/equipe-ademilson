@@ -195,6 +195,12 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
     // Limite de caption do Instagram: 2200 caracteres
     const caption = `${item.title}\n\n${item.content}\n\n${item.destination_url || ""}`.slice(0, 2200);
 
+    // Alvo da publicação: o ID da conta profissional do Instagram conectada.
+    // Com token de usuário Facebook, "/me" resolve para o usuário FB (não a IG).
+    const igAccounts = await getSocialAccounts("instagram");
+    const igConnected = igAccounts.find((a: any) => a && a.status === "connected" && a.account_id);
+    const target = igConnected?.account_id || "me";
+
     // A Graph API exige imagem raster (JPEG/PNG) publicamente acessível.
     // Usa media_url do item ou gera uma imagem via /social-image.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://equipe-ademilson.vercel.app";
@@ -206,7 +212,7 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
 
     // Step 1: Create media container
     const containerResponse = await fetch(
-      `https://graph.facebook.com/v19.0/me/media`,
+      `https://graph.facebook.com/v19.0/${target}/media`,
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -228,7 +234,7 @@ async function publishToInstagram(item: any, config: any): Promise<{ success: bo
 
     // Step 2: Publish container
     const publishResponse = await fetch(
-      `https://graph.facebook.com/v19.0/me/media_publish`,
+      `https://graph.facebook.com/v19.0/${target}/media_publish`,
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
