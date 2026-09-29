@@ -6,6 +6,7 @@ import {
   seedPrimeiraCampanha,
   getPlatformConfig,
   getSocialAccounts,
+  getPublicationItemByContentId,
 } from "@/lib/db";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -136,14 +137,22 @@ export async function GET(request: NextRequest) {
 
     const publishable = await getPublishablePlatforms(theme.platforms);
     const notPublishable = theme.platforms.filter((p) => !publishable.includes(p));
+    const duplicates: string[] = [];
 
     for (const platform of publishable) {
       const content = generateContent(platform, theme);
       const scheduledAt = new Date(today.getTime() + 30 * 60 * 1000).toISOString(); // +30min
+      const contentId = `daily-${today.toISOString().split("T")[0]}-${platform}-${theme.theme}`;
+
+      // Idempotência: não duplica se o cron for disparado mais de uma vez no mesmo dia
+      if (await getPublicationItemByContentId(contentId)) {
+        duplicates.push(platform);
+        continue;
+      }
 
       await addToPublicationQueue({
         campaign_id: campaignId,
-        content_id: `daily-${today.toISOString().split("T")[0]}-${platform}-${theme.theme}`,
+        content_id: contentId,
         platform,
         title: content.title,
         content: content.content,
@@ -162,7 +171,7 @@ export async function GET(request: NextRequest) {
     await createAgentLog({
       agent_type: "cron",
       action: "daily_content",
-      details: `Conteúdo diário gerado: tema "${theme.theme}" para ${addedItems.join(", ") || "nenhuma plataforma"}. ${addedItems.length} itens na fila.${notPublishable.length ? ` Ignoradas (sem API/conta): ${notPublishable.join(", ")}.` : ""}`,
+      details: `Conteúdo diário gerado: tema "${theme.theme}" para ${addedItems.join(", ") || "nenhuma plataforma"}. ${addedItems.length} itens na fila.${notPublishable.length ? ` Ignoradas (sem API/conta): ${notPublishable.join(", ")}.` : ""}${duplicates.length ? ` Já existentes hoje: ${duplicates.join(", ")}.` : ""}`,
       status: addedItems.length > 0 ? "success" : "warning",
     });
 
@@ -173,6 +182,7 @@ export async function GET(request: NextRequest) {
       angle: theme.angle,
       platforms: addedItems,
       skipped: notPublishable,
+      duplicates,
       queued: addedItems.length,
       duration_ms: Date.now() - startTime,
     });

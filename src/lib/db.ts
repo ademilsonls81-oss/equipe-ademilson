@@ -812,6 +812,10 @@ export async function addToPublicationQueue(data: { campaign_id: string; content
   return await runGet("SELECT * FROM publication_queue WHERE id = last_insert_rowid()") as PublicationItem;
 }
 
+export async function getPublicationItemByContentId(contentId: string): Promise<PublicationItem | null> {
+  return ((await runGet("SELECT * FROM publication_queue WHERE content_id = ? ORDER BY id DESC", [contentId])) as PublicationItem) || null;
+}
+
 export async function getPublicationQueue(filters?: { status?: string; platform?: string; campaign_id?: string; limit?: number; offset?: number }): Promise<PublicationItem[]> {
   let query = "SELECT * FROM publication_queue WHERE 1=1";
   const params: any[] = [];
