@@ -13,6 +13,19 @@
 const fs = require("fs");
 const path = require("path");
 
+// Carregar variáveis de ambiente (para acessar chaves do Jev, por ex.)
+require("dotenv").config({ path: path.join(__dirname, "../.env.local") });
+
+let jev = null;
+try {
+  const { Jev } = require("@typesafe-ai/sdk");
+  if (process.env.TYPESAFE_API_KEY) {
+    jev = new Jev({ apiKey: process.env.TYPESAFE_API_KEY });
+  }
+} catch (e) {
+  // Ignora se não existir, já que faremos fallback
+}
+
 const SITE_URL = "https://equipe-ademilson.vercel.app";
 const WA_GROUP = "https://chat.whatsapp.com/BT0oMJt9R5GLxjGpQu8qZ2";
 const DATA_DIR = path.join(__dirname, "../data");
@@ -70,7 +83,7 @@ function saveConfig(config) {
 
 // ==================== ANÁLISE ====================
 
-function analyzePerformance() {
+async function analyzePerformance() {
   console.log("\n📊 ANÁLISE DE PERFORMANCE\n");
   
   const performance = loadJSON("content-performance.json") || [];
@@ -134,8 +147,41 @@ function analyzePerformance() {
     bestPlatform: bestPlatform ? { name: bestPlatform[0], ...bestPlatform[1] } : null,
     worstPlatform: worstPlatform ? { name: worstPlatform[0], ...worstPlatform[1] } : null,
     bestTheme: bestTheme ? { name: bestTheme[0], ...bestTheme[1] } : null,
-    recommendations: generateRecommendations(byPlatform, byTheme, best, worst),
+    bestTheme: bestTheme ? { name: bestTheme[0], ...bestTheme[1] } : null,
+    recommendations: [],
   };
+  
+  // Usar Jev para gerar recomendações inteligentes se habilitado, senão cai pro fallback estático
+  if (jev) {
+    try {
+      console.log("🧠 Acionando JEV (System 1) para gerar recomendações inteligentes...");
+      // Analisa o estado geral das plataformas e pede escolhas prioritárias
+      const priorities = await jev.choice({
+        state: { byPlatform, totalContent: performance.length },
+        question: "Baseado nessa performance, qual plataforma deve ser a nossa prioridade absoluta para a próxima semana?",
+        choices: Object.keys(byPlatform).length > 0 ? Object.keys(byPlatform) : ["N/A"]
+      });
+      
+      const priorityAction = await jev.choice({
+         state: { topPlatform: priorities },
+         question: "Qual ação imediata maximizará as conversões nesta plataforma?",
+         choices: ["Aumentar o volume de CTAs de urgência", "Produzir mais vídeos educativos", "Mostrar mais provas sociais"]
+      });
+      
+      analysis.recommendations.push({
+        type: "smart-increase",
+        priority: "high",
+        action: priorityAction,
+        reason: `Decisão de IA Jev: Focar em ${priorities} dado o histórico.`
+      });
+    } catch(err) {
+      console.warn("Aviso Jev: falha ao extrair decisão inteligente, usando estático.");
+    }
+  }
+
+  // Completa com análises estáticas herdadas
+  const staticRecs = generateRecommendations(byPlatform, byTheme, best, worst);
+  analysis.recommendations = [...analysis.recommendations, ...staticRecs];
   
   saveJSON("analysis.json", analysis);
   log("analyze", `Análise completa: ${performance.length} conteúdos analisados`);
@@ -218,11 +264,14 @@ function generateRecommendations(byPlatform, byTheme, best, worst) {
 
 // ==================== GERAÇÃO DE CONTEÚDO ====================
 
-function generateContentCalendar() {
+async function generateContentCalendar() {
   console.log("\n📅 GERAÇÃO DE CALENDÁRIO\n");
   
   const config = getConfig();
-  const analysis = loadJSON("analysis.json") || analyzePerformance();
+  let analysis = loadJSON("analysis.json");
+  if (!analysis) {
+     analysis = await analyzePerformance();
+  }
   
   const themes = [
     { name: "Oportunidade", angle: "Apresentar nova oportunidade de ganho" },
@@ -391,10 +440,13 @@ function generateHashtags(theme, platform) {
 
 // ==================== RELATÓRIO ====================
 
-function generateReport() {
+async function generateReport() {
   console.log("\n📊 RELATÓRIO DE PERFORMANCE\n");
   
-  const analysis = loadJSON("analysis.json") || analyzePerformance();
+  let analysis = loadJSON("analysis.json");
+  if (!analysis) {
+     analysis = await analyzePerformance();
+  }
   const calendar = loadJSON("content-calendar.json") || [];
   const config = getConfig();
   
@@ -467,7 +519,9 @@ function generateNextActions(analysis) {
 
 const action = process.argv[2] || "analyze";
 
-console.log("🤖 ACQUISITION AGENT\n");
+console.log("🤖 ACQUISITION AGENT");
+if (jev) console.log("🌟 Powered by JEV (TypeSafe AI) System 1");
+console.log("\n");
 console.log(`Ação: ${action}`);
 console.log(`Data: ${new Date().toLocaleDateString("pt-BR")}`);
 console.log(`Hora: ${new Date().toLocaleTimeString("pt-BR")}\n`);
@@ -479,51 +533,54 @@ if (!config.enabled) {
   process.exit(0);
 }
 
-try {
-  switch (action) {
-    case "analyze":
-      const analysis = analyzePerformance();
-      console.log("\n📋 RECOMENDAÇÕES:");
-      analysis.recommendations.forEach((r, i) => {
-        console.log(`  ${i + 1}. [${r.priority.toUpperCase()}] ${r.action}`);
-        console.log(`     Motivo: ${r.reason}`);
-      });
-      break;
-      
-    case "generate":
-      const calendar = generateContentCalendar();
-      console.log("\n📅 CALENDÁRIO GERADO:");
-      calendar.forEach(day => {
-        console.log(`  ${day.date} (${day.theme}): ${day.contents.length} conteúdos`);
-      });
-      break;
-      
-    case "report":
-      const report = generateReport();
-      console.log("\n📊 RESUMO:");
-      console.log(`  Período: ${report.period.start} a ${report.period.end}`);
-      console.log(`  Total de conteúdos: ${report.summary.totalContent}`);
-      console.log(`  Melhor plataforma: ${report.summary.bestPlatform}`);
-      console.log(`  Melhor tema: ${report.summary.bestTheme}`);
-      console.log("\n🎯 PRÓXIMAS AÇÕES:");
-      report.nextActions.forEach(a => {
-        console.log(`  ${a.priority}. ${a.action}`);
-      });
-      break;
-      
-    case "reset":
-      config.enabled = true;
-      config.lastAnalysis = null;
-      config.lastGeneration = null;
-      saveConfig(config);
-      log("reset", "Configurações resetadas");
-      console.log("✅ Agente reativado e configurações resetadas.");
-      break;
-      
-    default:
-      console.log("Ação desconhecida. Use: analyze, generate, report, reset");
+(async () => {
+  try {
+    switch (action) {
+      case "analyze":
+        const analysis = await analyzePerformance();
+        console.log("\n📋 RECOMENDAÇÕES:");
+        analysis.recommendations.forEach((r, i) => {
+          console.log(`  ${i + 1}. [${r.priority.toUpperCase()}] ${r.action}`);
+          console.log(`     Motivo: ${r.reason}`);
+        });
+        break;
+        
+      case "generate":
+        const calendar = await generateContentCalendar();
+        console.log("\n📅 CALENDÁRIO GERADO:");
+        calendar.forEach(day => {
+          console.log(`  ${day.date} (${day.theme}): ${day.contents.length} conteúdos`);
+        });
+        break;
+        
+      case "report":
+        const report = await generateReport();
+        console.log("\n📊 RESUMO:");
+        console.log(`  Período: ${report.period.start} a ${report.period.end}`);
+        console.log(`  Total de conteúdos: ${report.summary.totalContent}`);
+        console.log(`  Melhor plataforma: ${report.summary.bestPlatform}`);
+        console.log(`  Melhor tema: ${report.summary.bestTheme}`);
+        console.log("\n🎯 PRÓXIMAS AÇÕES:");
+        report.nextActions.forEach(a => {
+          console.log(`  ${a.priority}. ${a.action}`);
+        });
+        break;
+        
+      case "reset":
+        config.enabled = true;
+        config.lastAnalysis = null;
+        config.lastGeneration = null;
+        saveConfig(config);
+        log("reset", "Configurações resetadas");
+        console.log("✅ Agente reativado e configurações resetadas.");
+        break;
+        
+      default:
+        console.log("Ação desconhecida. Use: analyze, generate, report, reset");
+    }
+  } catch (e) {
+    log("error", e.message, "error");
+    console.error("❌ Erro:", e.message);
   }
-} catch (e) {
-  log("error", e.message, "error");
-  console.error("❌ Erro:", e.message);
-}
+})();
+

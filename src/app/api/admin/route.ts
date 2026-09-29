@@ -4,7 +4,7 @@ import { checkAdminAuth } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   if (!checkAdminAuth(req)) {
-    return new NextResponse("Unauthorized", { status: 401, headers: { "WWW-Authenticate": "Basic realm=\"Admin\"" } });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get("page") || "1");

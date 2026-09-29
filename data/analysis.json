@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-09-29T14:58:23.849Z",
+  "totalContent": 0,
+  "byPlatform": {},
+  "byTheme": {},
+  "bestContent": null,
+  "worstContent": null,
+  "bestPlatform": null,
+  "worstPlatform": null,
+  "bestTheme": null,
+  "recommendations": [
+    {
+      "type": "test",
+      "priority": "medium",
+      "action": "Testar novo CTA: 'Garanta sua vaga agora'",
+      "reason": "CTAs com urgência tendem a ter maior taxa de conversão"
+    },
+    {
+      "type": "create",
+      "priority": "high",
+      "action": "Criar 5 novas landing pages para cidades com mais de 100k habitantes",
+      "reason": "Landing pages locais convertem melhor que páginas genéricas"
+    }
+  ]
+}
